@@ -1,0 +1,615 @@
+---
+title: 'Rapid Epidemiological Analysis of Comorbidities and Treatments as risk factors for COVID-19 in Scotland (REACT-SCOT): a population-based case-control study'
+author: 
+  - name: Paul M McKeigue\textsuperscript{\getAff{Usher}}
+    email: paul.mckeigue@ed.ac.uk
+    affiliation: HPS
+  - name: Amanda Weir 
+    affiliation: HPS
+  - name: Jen Bishop
+    affiliation: HPS
+  - name: Stuart J McGurnaghan
+    affiliation: IGMM
+  - name: Sharon Kennedy
+    affiliation: ISD
+  - name: David McAllister\textsuperscript{\getAff{Glasgow}} 
+    affiliation: HPS
+  - name: Chris Robertson\textsuperscript{\getAff{Strathclyde}} 
+    affiliation: HPS
+  - name: Rachael Wood
+    affiliation: ISD
+  - name: Nazir Lone
+    affiliation: Usher
+  - name: Janet Murray
+    affiliation: HPS 
+  - name: Thomas M Caparrotta 
+    affiliation: IGMM
+  - name: Alison Smith-Palmer 
+    affiliation: HPS
+  - name: David Goldberg
+    affiliation: HPS
+  - name: Jim McMenamin
+    affiliation: HPS
+  - name: Colin Ramsay
+    affiliation: HPS
+  - name: Sharon Hutchinson\textsuperscript{\getAff{GCU}} 
+    affiliation: HPS
+  - name: Helen M Colhoun\textsuperscript{\getAff{IGMM}}
+    affiliation: HPS
+address: 
+  - code: Usher
+    address: Usher Institute, College of Medicine and Veterinary Medicine, University of Edinburgh, Teviot Place, Edinburgh EH8 9AG, Scotland. PM - Professor of Genetic Epidemiology and Statistical Genetics. NL - Clinical Senior Lecturer in Critical Care
+
+  - code: IGMM
+    address: Institute of Genetics and Molecular Medicine, College of Medicine and Veterinary Medicine, University of Edinburgh, Western General Hospital Campus, Crewe Road, Edinburgh EH4 2XUC, Scotland. HC - AXA Chair in Medical Informatics and Epidemiology. TC - Sir George Alberti Doctoral Fellow in Pharmacoepidemiology. 
+
+  - code: HPS
+    address: Public Health Scotland, Meridian Court, 5 Cadogan Street, Glasgow G2 6QE
+
+  - code: Glasgow
+    address: Institute of Health and Wellbeing, University of Glasgow, 1 Lilybank Gardens, Glasgow G12 8RZ. DM - Wellcome Trust Intermediate Clinical Fellow and Beit Fellow 
+
+  - code: Strathclyde
+    address: Department of Mathematics and Statistics, University of Strathclyde, 16 Richmond Street, Glasgow G1 1XQ. CR - Professor of Public Health Epidemiology
+
+  - code: GCU
+    address: School of Health and Life Sciences, Glasgow Caledonian University. SH - Professor of Epidemiology and Population Health 
+
+  - code: ISD
+    address: NHS Information Services Division (Public Health Scotland), Gyle Square, 1 South Gyle Crescent, Edinburgh, EH12 9EB.  RW - Consultant in Maternal and Child Health. 
+
+geometry: margin=1in
+fontsize: 11pt
+linenumbers: true
+bibliography: ../covid.bib
+
+header-includes: |
+  \let\origquote\quote
+  \def\quote{\origquote\itshape}
+  \usepackage{graphicx}
+  \usepackage{longtable}
+  \usepackage{booktabs}
+  \usepackage{float}
+  \usepackage{array}
+  \usepackage{booktabs}
+  \usepackage{longtable}
+  \usepackage{lscape}
+output: 
+#  pdf_document:
+  rticles::plos_article:
+    includes:
+      in_header: ../preamble.tex
+    latex_engine: lualatex
+    fig_caption: true
+    keep_tex: true
+
+csl: ../plos.csl
+urlcolor: blue
+---
+
+On behalf of Public Health Scotland COVID-19 Health Protection Study Group
+
+```{r functions, echo=FALSE}
+library(knitr)
+library(kableExtra)
+
+# rmarkdown::render("casecontrol.Rmd", output_file="casecontrol.pdf")
+
+
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+
+source("helperfunctions.R")
+
+table.demog.append <- table.ethnicsmr.aug
+colnames(table.demog.append) <- colnames(table.demog.aug)[1:4]
+table.demog.append[, 4] <- as.character(table.demog.append[, 4])
+table.demog.aug[, 4] <- as.character(table.demog.aug[, 4])
+                                         
+table.demog.append <- data.frame(varname=c(rownames(table.demog.aug),
+                                           rownames(table.ethnicsmr.aug)),
+                                 rbind(table.demog.aug[, 1:4], table.demog.append))
+
+table.densities <- rbind(summary(demog.densities),
+                         summary(listed.densities),
+                         summary(full.densities))[, 1:6]
+
+table.ethnicsmr.missing <- paste.colpercent(with(cc.severe, table(is.na(ethnic5.smr), CASE)))
+
+table.notlisted.scrip <- paste.colpercent(with(cc.severe[notlisted, ], table(scrip.any, CASE)))
+table.notlisted.diag <- paste.colpercent(with(cc.severe[notlisted, ], table(diag.any, CASE)))
+table.notlisted.scripordiag <- paste.colpercent(with(cc.severe[notlisted, ], table(scripordiag, CASE)))
+
+table.lt60.notlisted.scripordiag <- paste.colpercent(with(cc.severe[cc.severe$AGE < 60 & notlisted, ], table(scripordiag, CASE)))
+
+```
+
+\newpage
+
+# Abstract
+
+_Background_--   The objectives of this study were to identify risk factors for severe  COVID-19 and to lay the basis for risk stratification based on demographic data and health records. 
+
+_Methods_ -- The design was a matched case-control study. Severe cases were all those with a positive nucleic acid test for SARS-CoV-2 in the national database who had entered a critical care unit or died within 28 days of the first positive test.  Seven controls per case matched for sex, age and primary care practice were selected from the population register.  All diagnostic codes from the past five years of hospitalisation records and all drug codes from prescriptions dispensed during the past nine months were extracted.  Rate ratios for severe COVID-19 were estimated by conditional logistic regression.  
+
+_Findings_ -- There were `r length(which(cc.severe$CASE==1))` severe cases. In a logistic regression using the age-sex distribution of the national population, the odds ratios for severe disease were `r round(exp(10 * logistic.coeffs[3, 1]), 2)` for a 10-year increase in age and `r round(exp(-logistic.coeffs[2, 1]), 2)` for male sex.  In the case-control analysis, the strongest risk factor was residence in a care home, with rate ratio (95% CI) `r table.agegr.all[1, 3]`.  Univariate rate ratios (95% CIs) for conditions listed by public health agencies as conferring high risk were `r table.agegr.all[5, 3]` for Type 1 diabetes, `r table.agegr.all[6, 3]` for Type 2 diabetes, 
+`r table.agegr.all[8, 3]` for ischemic heart disease,
+`r table.agegr.all[9, 3]` for other heart disease, 
+`r table.agegr.all[10, 3]` for chronic lower respiratory tract disease, 
+`r table.agegr.all[11, 3]` for chronic kidney disease, 
+`r table.agegr.all[12, 3]` for neurological disease, 
+`r table.agegr.all[13, 3]` for chronic liver disease and 
+`r table.agegr.all[14, 3]` for immune deficiency or suppression.
+
+`r gsub("([0-9]+ \\()(.*)(\\))", "\\2", freqs.all[nrow(freqs.all), 2])` of cases and `r gsub("([0-9]+ \\()(.*)(\\))", "\\2", freqs.all[nrow(freqs.all), 1])` of controls had at least one listed condition (`r gsub("([0-9]+ \\()(.*)(\\))", "\\2", table.agegr[4, 2])` of cases and `r gsub("([0-9]+ \\()(.*)(\\))", "\\2", table.agegr[4, 1])` of controls under age 40).  Severe disease was associated with encashment of at least one prescription in the past nine months and with at least one hospital admission in the past five years [rate ratios `r table.agegr.all[2, 3]`] and `r table.agegr.all[3, 3]` respectively] even after adjusting for the listed conditions.  In those without listed conditions significant associations with severe disease were seen across many hospital diagnoses and drug categories. Age and sex provided `r round(cases.Lambda.agesex, 2)` bits of information for discrimination.  A model based on demographic variables, listed conditions, hospital diagnoses and prescriptions provided an additional `r table.densities[3, 5]` bits (C-statistic `r table.densities[3, 3]`).  
+
+_Conclusions_ -- Along with older age and male sex, severe COVID-19 is strongly associated with past medical history across all age groups. Many comorbidities beyond the risk conditions designated by public health agencies contribute to this.  A risk classifier that uses all the information available in health records, rather than only a limited set of conditions, will more accurately discriminate between low-risk and high-risk individuals who may require shielding until the epidemic is over.  
+
+\newpage
+
+# Background
+Case series from many countries have suggested that in those with severe COVID-19 the prevalence of diabetes and cardiovascular disease is higher than expected.  For example in a large UK series the commonest co-morbidities were cardiac disease, diabetes, chronic pulmonary disease and asthma [@docherty_features_2020]. However there are also anecdotal reports of apparently healthy young persons succumbing to disease [@mcgoogan_why_2020].
+
+Quantification of the risk associated with characteristics and co-morbidities has been limited by the lack of comparisons with the background population [@zhou_clinical_2020;@grasselli_baseline_2020;@guan_clinical_2020].  Two recent studies in the UK have included population comparators and have reported associations of in hospital test positive persons and COVID-19 death in hospital with co-morbidities including diabetes, asthma and heart disease [@niedzwiedz_ethnic_2020; @the_opensafely_collaborative_opensafely_2020].  These studies  have focused on conditions presumptively listed by public health agencies as increasing risk for COVID-19 based on case series data.  
+
+Here we examine the frequency of sociodemographic factors and  these listed conditions in  all people with severe COVID-19 disease in  Scotland compared to matched controls from the general population.  In those without listed conditions we report a systematic examination of the hospitalisation record and prescribing history in severe  COVID-19 cases  compared to controls. The objectives were to identify  risk factors for severe COVID-19 and to lay the basis for risk stratification based on a predictive model.  
+
+# Methods
+## Case definition 
+The Electronic Communication of Surveillance in Scotland (ECOSS) database captures all virology testing in all NHS laboratories nationally.  All individuals testing positive for nucleic acid for SARS-CoV-2 up to `r format(max(cc.severe$SPECDATE, na.rm=TRUE), "%d %B %Y")` in ECOSS were ascertained for this study.  Using the Community Health Index (CHI) identifier contained in ECOSS (the CHI number is a unique identifier used in all care systems in Scotland) linkage to other datasets was carried out. Hospital admissions from the time of testing were obtained from the RAPID database a daily return of current hospitalisations each day.  Admissions to critical care were obtained from the Scottish Intensive Care Society and Audit Group (SICSAG) database that covers admissions to critical care [comprising adult intensive care units (ICUs), high dependency units (HDUs) and combined ICU / HDU units] across Scotland and has returned a daily census of patients in critical care from the beginning of the COVID-19 epidemic. Death registrations up to `r gsub("^0", "", format(max(cc.severe$Date.Death, na.rm=TRUE), "%d %B %Y"))` were obtained from linkage to the National Register of Scotland.  
+
+Severe or fatal COVID-19 was defined by a record of entering critical care in the SICSAG database, or death within 28 days of a positive nucleic acid test, regardless of the cause of death given on the death certificate.  By restricting the case definition to those cases that were fatal or received critical care, we ensured complete ascertainment of all test-positive cases that were severe enough to have been fatal without critical care, whatever selection policies may have determined admission to hospital or entry to critical care. 
+
+## Matched controls
+For each test-positive case, we ascertained ten matched controls of the same sex, one-year age band and registered with the same primary care practice who were alive on the date of the first test in the case using the Community Health Index (CHI) database. After removing embarkations there were seven controls per case. As this is an incidence density sampling design, it is possible and correct for an individual to appear in the dataset more than once, initially as a control and subsequently as a case.  
+
+## Demographic data
+Residence in a care home was ascertained from the CHI database. Socioeconomic status was assigned as the Scottish Index of Multiple Deprivation (SIMD), an indicator based on postal code.  Ethnicity was assigned based on applying a name classification algorithm (ONOMAP) [@lakha_name_2011] to the names in the CHI database.  For `r gsub("(.*\\()(.*)\\)", "\\2", table.ethnicsmr.missing[1, 1])` of controls and `r gsub("(.*\\()(.*)\\)", "\\2", table.ethnicsmr.missing[1, 2])` of cases self-assigned ethnicity, based on the categories used in the Census, had been recorded in Scottish Morbidity Records (SMR).  Cross-tabulation of `r sum.xtabulate` records for which both name classification and SMR records of ethnicity were available showed that the ONOMAP algorithm had sensitivity of `r round(SouthAsian.sensitivity)`% and specificity of `r round(SouthAsian.specificity, 2)`% for classifying South Asian ethnicity, but misclassified most of those who identified as African, Caribbean or Black.  
+
+## Morbidity and drug prescribing
+For all cases and controls, ICD-10 diagnostic codes were extracted from the last five years of hospital discharge records in the Scottish Morbidity Record (SMR01), excluding records of discharges less than 25 days before testing positive for SARS-CoV-2 and using all codes on the discharge. Diagnostic coding under ICD chapters 5 (Mental, Behavioural and Neurodevelopmental) and 15 (Pregnancy) is incomplete as most psychiatric and maternity unit returns are not captured in SMR01. British National Formulary (BNF) drug codes were extracted from the last year of encashed prescriptions, excluding those encashed less than 25 days before testing positive for SARS-CoV-2.  The BNF groups drugs by 2-digit chapter codes.  For this analysis prescription codes from chapters 14 and above, mostly for dressings and appliances but also including vaccines were grouped as "Other". 
+
+We began by scoring a specific list of  conditions that have been designated as risk conditions for COVID-19 by public health agencies [@nhs_whos_2020].  A separate list of conditions designates "clinically extremely vulnerable" individuals who have been advised to shield themselves completely since early in the epidemic: this list includes solid organ transplant recipients, people receiving chemotherapy for cancer, and people with cystic fibrosis or leukaemia.  We did not separately tabulate these conditions as we expected these individuals to be underrepresented among cases if shielding was adequate.  
+
+The eight listed conditions were scored based on diagnostic codes in any hospital discharge record during the last five years, or encashed prescription of a drug for which the only indications are in that group of diagnostic codes. The R script included as supplementary material contains the derivations of these variables from ICD-10 codes and BNF drug codes.  Diagnosed cases of diabetes were identified through linkage to the national diabetes register (SCI-Diabetes), with a clinical classification of diabetes type as Type 1, Type 2 or Other/Unknown. 
+
+## Statistical methods
+To estimate the relation of cumulative incidence and mortality from COVID-19 to age and sex, logistic regression models were fitted to the proportions of cases and non-cases in the Scottish population, using the estimated population of Scotland in mid-year 2019 which were available by one-year age group up to age 90 years. To allow for possible non-linearity of the relationship of the logit of risk to age, we also fitted generalized additive models, implemented in the R function `gam::gam`, with default smoothing function. 
+
+For the case-control study, all estimates of associations with severe COVID-19 were based on conditional logistic regression, implemented as Cox regression in the R function `survival::clogit`.  Among those cases and controls without any of the pre-defined conditions we then further examined associations of ICD-10 and BNF chapter with severe COVID-19.  Restriction of cases and controls, for instance to exclude those with any listed condition, may generate strata that do not contain at least one case and at least one control, but these strata are ignored by the conditional logistic regression model as they do not contribute to the conditional likelihood.  With incidence density sampling, the odds ratios in conditional logistic regression models are equivalent to rate ratios.  Note that odds ratios in a matched case control study are based on the conditional likelihood and the unconditional odds ratios calculable from the frequencies of exposure in cases and controls will differ from these and should not be used [@breslow_estimation_1978].
+Although matching on primary care practice will match to some extent for associated variables such as care home residence, socioeconomic disadvantage and prescribing practice, the effects of these variables are still estimated correctly by the conditional odds ratios but with less precision than in an unmatched study of the same size [@breslow_estimation_1978].
+
+To construct risk prediction models, we used stepwise regression alternating between forward and backward steps to maximize the AIC, implemented in the R function `stats::step`.  The performance of the risk prediction model in classifying cases versus non-cases of severe COVID-19 was examined by `r nfold`-fold cross-validation. We calculated the performance calculated over all test folds using the C-statistic but also using the "expected information for discrimination" $\Lambda$ expressed in bits [@mckeigue_quantifying_2019].  The use of bits (logarithms to base 2) to quantify information is standard in information theory: one bit can be defined as the quantity of information that halves the hypothesis space.  Although readers may be unfamiliar with the expected information for discrimination $\Lambda$, it has several properties that make it more useful than the C-statistic for quantifying increments in the performance of a risk prediction model [@mckeigue_quantifying_2019].  A key advantage of using $\Lambda$ is that contributions of independent predictors can be added.  Thus in this study we can add the predictive information from a logistic model of age and sex in the general population to the predictive information provided by other risk factors from the case-control study matched for age and sex.  
+
+# Results
+## Incidence and mortality from severe COVID-19 in the Scottish population
+Figure \ref{fig:rates} shows the relationships of incidence and mortality rates to age for each sex separately.  The relationship of mortality to age is almost exactly linear on a logit scale, and the lines for male and female mortality are almost parallel.  In models that included age and sex as covariates, the odds ratio associated with a 10-year increase in age was `r round(exp(10*logistic.coeffs[3, 1]), 2)` for all severe disease and `r round(exp(10*logistic.coeffs[3, 2]), 2)` for fatal disease. The odds ratio associated with male sex was `r round(exp(-logistic.coeffs[2, 1]), 2)` for all severe disease and `r round(exp(-logistic.coeffs[2, 2]), 2)` for fatal disease. For severe cases as defined in this study, the sex differential is narrow up to about age 50 but widens between ages 50 and 70 years.  Thus at younger ages the ratio of critical care admissions to total fatalities is higher in women than in men, but that at later ages the ratio of critical admissions to total fatalities is higher in men.  
+
+## Risk factors
+### Sociodemographic factors
+Table \ref{tab:demog} shows univariate associations of demographic factors with severe disease.  Residence in a care home was by far the strongest risk factor for severe disease.  Higher risk of severe disease was also associated with socioeconomic deprivation.  Associations with ethnicity are shown for the full dataset based on name classification and separately for the subset of cases and controls in whom ethnicity had been recorded in the Scottish Morbidity Record.  With Whites as reference category, the rate ratio (95% CI) associated with South Asian ethnicity was `r table.demog.append[2, 4]` based on name classification and `r table.demog.append[11, 4]`, based on the subset with SMR records. The numbers of cases in other non-White ethnic groups were too sparse to tabulate separately. 
+
+### Factors derived from hospitalisation and prescribing records
+Prevalence of the listed conditions in cases and controls by age band is shown in Table \ref{tab:agegr}.  `r gsub("\\\\", "", table.agegr[4, 2])` of the cases aged under 40 years had at least one listed condition, compared with only `r gsub("\\\\", "", table.agegr[4, 1])` of the controls.  In those aged 75+ years `r gsub("\\\\", "", table.agegr[4, 8])` of the cases and `r gsub("\\\\", "", table.agegr[4, 7])` of the controls had at least one listed condition.  Among those aged under 40 years, `r table.agegr[6, 2]` of the cases and `r table.agegr[6, 1]` of the controls had either a hospital admission in the last five years or a dispensed prescription in the last year.  Differences in prescription rates  between cases an controls narrowed with increasing age.
+
+Over all age groups, `r freqs.all[nrow(freqs.all), 2]` of severe cases and `r freqs.all[nrow(freqs.all), 1]` of controls had at least one of the listed conditions.  As shown in Table \ref{tab:listed.conditions.allages}, all the listed conditions were more frequent in cases than controls except for immune conditions in the 75+ age group.  The rate ratio associated with type 1 diabetes was higher than that for type 2 diabetes.  The rate ratio was `r table.agegr.all[8, 3]` for ischemic heart disease compared to `r table.agegr.all[9, 3]` for the broad category "other heart disease".  In multivariate analysis ischemic heart disease was not independently associated with severity whereas other heart disease remained strongly associated. In those without a listed condition `r table.notlisted.scripordiag[2, 2]` of the cases and `r table.notlisted.scripordiag[2, 1]` of the controls had either a recent admission or a prescription.  In those aged under 60 years without a listed condition, `r table.lt60.notlisted.scripordiag[2, 2]` of the cases and `r table.lt60.notlisted.scripordiag[2, 1]` had either a recent admission or a prescription. 
+
+Supplementary Tables \ref{tab:listed.conditions.lt60} to \ref{tab:listed.conditions.ge75} examine these associations by age group, with the 0-39 and 40-59 year age bands combined.  All listed conditions were associated with severe disease in each age band.  In those aged under 60 years, the rate ratio was `r tables.agegr[[1]][5, 3]` for Type 1 diabetes and `r tables.agegr[[1]][6, 3]` for Type 2 diabetes.  The multivariate analyses shown in Table \ref{tab:listed.conditions.allages} and \ref{tab:listed.conditions.lt60} to \ref{tab:listed.conditions.ge75} show that overall and in each age group  group  any admission to hospital in the past five years were strongly and independently associated with severe disease even after adjusting for care home residence and listed conditions. Dispensing of any prescription in the past year was associated with severe disease  in multivariate analyses in the two younger age bands.  Table \ref{tab:fatal} shows that in each age group the proportion of fatal cases who had not had either a hospital admission in the last five years or a dispensed prescription in the last year was very low. 
+
+In a sensitivity analysis in which we also included deaths registered with mention of COVID-19 on the death certificate in the definition of severe cases (Table \ref{tab:agegr.withNRS}) the same pattern of differences in prior admissions and prescribing history and in listed conditions between cases and controls was found, with the difference in residential are home status being somewhat greater. Such deaths were not included in our primary outcome definition as misclassification rates for COVID assignation as cause are unknown. 
+
+## Systematic analysis of diagnoses associated with severe disease
+The association of severe COVID-19 with prior hospital admission was examined further by testing for association of hospitalisations at each ICD-10 chapter level with severe COVID-19, among those without any of the listed conditions.  These results are shown in Table \ref{tab:conditions}.  In univariate analyses, almost all ICD-10 chapters, with the exception of Chapters 7 (eye) Chapters 8 (ear) and Chapter 15 (pregnancy) were associated with increased risk of severe disease.  Note that hospital diagnoses classified under the pregnancy chapter here are derived from admissions with pregnancy related medical conditions to non-obstetric units only, as obstetric returns are not in the SMR01 dataset. In a multivariate analysis the most significant association was with diagnoses in ICD chapter 2 (neoplasms). Supplementary Table \ref{tab:icdsubchapters} extracts univariate associations with ICD-10 subchapters in those without any listed conditions.  This table is filtered to show only subchapters for which the univariate p-value is <0.001 and where there are at least 50 cases and controls with a diagnosis in this subchapter.  This shows that many subchapter diagnoses are associated with markedly higher risk of severe COVID-19.  <!-- check why cerebrovascular disease does not come out here -->
+
+## Associations of prescribed drugs with severe disease 
+As shown in Table \ref{tab:listed.conditions.allages} and supplementary tables \ref{tab:listed.conditions.lt60} to \ref{tab:listed.conditions.ge75} ,  encashment of at least one prescription in the last year was associated with severe disease.  The univariate rate ratio associated with this variable varies from `r tables.agegr[[1]][2, 3]` in those aged under 60 years to `r tables.agegr[[3]][2, 3]` in those aged 75 years and over.  In a multivariate analysis adjusting for care home residence, any hospital admission and listed conditions, these rate ratios were reduced to `r tables.agegr[[1]][2, 5]` and `r tables.agegr[[3]][2, 5]` respectively.  
+
+To investigate this further, we partitioned the "Any prescription" variable into indicator variables for each chapter of the British National Formulary, in which drugs are grouped by broad indication, and restricted the analysis to those without one of the listed conditions.  Table \ref{tab:drugs} shows these associations.  In univariate analyses, prescriptions in almost all BNF chapters were associated with severe disease.  In a multivariate analysis of all chapters, most of these associations were weaker.  The BNF chapters with the strongest independent associations with severe disease were chapters 1 (gastrointestinal) and chapters 4 (central nervous system).  Other chapters associated with severe disease were 2 (cardiovascular),  5 (infections), 9 (nutrition and blood) and 14+ (other, mostly dressings and appliances).  
+
+## Construction of a multivariate risk prediction model 
+To evaluate the contribution of the listed conditions to risk prediction, and the incremental contribution of other information in hospitalisation and prescription records after assigning these conditions, predictive models were constructed from three sets of variables: a baseline set consisting only of demographic variables, a set that included indicator variables for each listed condition, and an extended set that included demographic, variables, indicator variables for listed conditions and indicator variables for hospital diagnoses in each ICD-10 chapter and prescriptions in each BNF chapter.  
+
+For each variable set, a stepwise regression procedure was carried out using alternating forward-backward selection. The variables retained with each variable set are shown in Table \ref{tab:stepwise}. Coefficients for specific conditions here should not be interpreted as effect estimates, as global variables for any hospital diagnosis and any listed condition have been included in the model. The predictive performance of the model chosen by stepwise regression was estimated by `r nfold`-fold cross-validation.  Observed and predicted case status were compared within each stratum over all test folds.  Table \ref{tab:xvalid} shows that using the extended set increased the C-statistic from `r table.densities[2, 3]` to `r table.densities[3, 3]` and the expected information for discrimination $\Lambda$ from `r table.densities[2, 5]` bits to `r table.densities[3, 5] ` bits.  
+
+This estimate of `r table.densities[3, 5] ` bits for the information conditional on age and sex obtained from the matched case-control study can be added to the information for discrimination `r round(cases.Lambda.agesex, 2)` bits obtained from the logistic regression on age and sex in the population using age and sex to estimate the total information for discrimination of a risk classifier that would be obtained in the population as `r table.densities[3, 5] + round(cases.Lambda.agesex, 2)` bits. 
+
+Figure \ref{fig:wevid} shows the distribution of the weight of evidence favouring case over control status from the model based on the extended variable set with a footnote explaining how $\Lambda$ is derived. This shows, as expected for a multifactorial classifier, that the distributions are approximately Gaussian: there is no clear divide between high-risk and low-risk individuals of the same age and sex. Figure \ref{fig:roc} shows the receiver operating characteristic curve with a footnote explaining its derivation from the distribution of the weights of evidence.  
+
+# Discussion  
+### Sociodemographic factors
+This analysis confirms that risk for severe COVID-19 is associated with increasing age, male sex and socioeconomic deprivation.  The slope of the relationship of severe disease (on the scale of log odds) to age is less steep than the slope of the relationship of fatal disease to age.  <!---Another way of expressing this is that the fatality rate of severe disease increases with age. Although the relationships of mortality to age are linear and parallel for men and women, the fatality rate of severe disease is lower in women than in men up to age 50 and higher in women than in men between ages 50 and 70.  This may reflect either variation in the biology of the disease, or differential selection for entry to critical care.--->  Residence in a care home was associated with a `r round(as.numeric(substr(table.agegr.all[1, 3], 1, 4)))`-fold increased rate of severe COVID-19 in this age matched analysis, reduced to `r round(as.numeric(substr(table.agegr.all[1, 5], 1, 4)))`-fold by adjustment for listed conditions. This excess risk is likely to reflect both the spread of the epidemic in care homes and residual confounding by frailty.
+
+Although the numbers of cases and controls of non-White ethnicity are small and the assignment of ethnicity is incomplete, the results give some indication of the likely upper bound of the absolute numbers of severe cases in non-White ethnic groups up to now.  The only non-White ethnic group with any sizeable numbers is the South Asian category and we found no clear evidence of any elevation in risk in this group compared to Whites.  Reports from England [@the_opensafely_collaborative_opensafely_2020] found elevation in risks for some non-White groups. In the OpenSAFELY study risk ratios for fatal COVID-19 of 1.7 in those recorded as Black and and 1.6 in those recorded as Asian, in comparison with those recorded as White, persisted after adjustment for comorbidities and socioeconomic status.  In a study of risk factors for hospitalized disease in the UK Biobank cohort, adjustment for health care worker status and other social variables attenuated but did not fully explain the elevated crude risk ratios associated with non-White ethnicity [@niedzwiedz_ethnic_2020; @ho_modifiable_2020].  The relative socioeconomic position of ethnic groups in Scotland is different to that in England, so it is plausible that the relation of health status to ethnicity will also differ.  For example in the 2011 Scottish Census 1.6% of the population reported South Asian ethnicity.  Among the 1.0% who identified as Pakistani or Bangladeshi the proportion living in the most deprived neighbourhoods was not higher than the national average [@walsh_increasingly_2019].  Future work may allow more complete assignment of ethnicity and disaggregation of broad categories based on continent of origin. 
+
+### Co-morbidities
+We have confirmed that the moderate risk conditions designated by the NHS and other agencies [@nhs_whos_2020] are associated with increased risk of severe COVID-19.  However the rate ratios associated with these conditions vary with age - for example the rate ratio associated with diabetes is higher at younger ages. The rate ratios of `r round(as.numeric(substr(table.agegr.all[5, 3], 1, 4)), 1)` for Type 1 diabetes and `r round(as.numeric(substr(table.agegr.all[6, 3], 1, 4)), 1)` for Type 2 diabetes are broadly similar to those reported in UK Biobank and in the OpenSAFELY studies.  We confirm the higher risk with asthma and chronic lung disease and liver disease reported in these and earlier studies.  Of note other heart disease is more strongly associated than ischaemic heart disease.  This category includes conditions such as atrial fibrillation, cardiomyopathies and heart failure.  Over all age groups, `r gsub("(.*\\()(.*)\\)", "\\2", freqs.all[nrow(freqs.all), 2])` of severe cases had at least one of these listed conditions.  Among cases and controls without these conditions, not surprisingly, neoplasms were associated with severe COVID-19; we had omitted it from the pre-specified list as in the current dataset we cannot separately identify those who are currently receiving chemotherapy or radiotherapy for whom shielding is advised.  We have not attempted to estimate the risk associated with these conditions for which shielding is recommended, as the observed risk will depend on the adequacy of shielding rather than on the risk to those exposed to the epidemic.  In patients without any listed conditions, further systematic evaluation of past hospitalisation history did not reveal a sparse set of underlying conditions; instead many diagnoses were associated with severe COVID-19.  
+
+Media reports of apparently healthy young people succumbing to severe COVID-19 have disseminated the message that all are at risk of disease whatever their age or health status.  However we found that half of cases under 40 years had at least one of the listed conditions and among those who did not have one of these conditions, the proportions who had at least one prior hospitalisation or dispensed prescription were higher in cases than in controls.  In all age groups, very few of the fatal cases had not had either a hospital admission in the past five years or a dispensed prescription in the past year. 
+
+An important finding of this study was the strong association of severe COVID-19 with having encashed at least one prescription in the past year, only partly explained by higher rates of prescribing among those with listed conditions.  Partitioning of this association between BNF chapters, which represent broad indication-based drug classes, showed that the strongest association was with prescription of Chapter 1 drugs, prescribed for gastrointestinal conditions, which are not generally listed as risk factors for severe COVID-19.  Also associated were those in the  nervous system,  cardiovascular, and nutritional and blood chapters.  Although it is likely that most associations of severe COVID-19 with drug prescribing are attributable to the indications for which these drugs were prescribed, or more diffuse frailty especially in older persons, causal effects of drugs or direct effects of polypharmacy on susceptibility cannot be ruled out.  These associations are explored in an accompanying paper.  
+
+## Relevance to policy
+As lockdown restrictions are eased, there is general agreement that vulnerable individuals will require shielding, even if the restart of the epidemic can be slowed or suppressed by mass testing, contact tracing and isolation of those who test positive.  The "stratify and shield" policy option [@mckeigue_evaluation_2020], in which high-risk individuals comprising up to 15% of the population are shielded for a defined period while the epidemic is allowed to run relatively quickly in low-risk individuals until population-level immunity is attained, depends critically on informative risk discrimination.   So too does the similarly named "segment and shield " option [@bunnik_segmentation_2020] which has the opposite objective of keeping transmissions low. 
+
+As awareness grows of how risk varies between individuals, individuals will seek information about their own level of risk.  A key implication of our results is that risk of severe or fatal disease is multifactorial and that the rate ratio of `r round(exp(20 * logistic.coeffs[3, 1]), 1)` associated with a 20-year increase in age is stronger than that associated with common diseases such as Type 2 diabetes and asthma that are listed as conditions associated with high risk.  A corollary of this is that a crude classification based on assigning all persons with a listed condition to a group for whom shielding is recommended will have poor specificity, as one quarter of those aged 60-74 years in the population have at least one of the listed conditions we examined.  It will also exclude many people at high risk because they have multiple risk factors each of small effect.  The only way to optimize risk classification so as to ensure equity with respect to risk is to construct a classifier that uses all available information to assign a risk score.  Our results show that this is possible in principle, though for this preliminary study we have not used the full repertoire of machine learning methods available for this type of problem.  In Scotland it is technically possible to use existing electronic health records to calculate a risk score for every individual in the population, though more work would be required to develop this as a basis for official advice and individual decisions.  
+
+## Methodological strengths and weaknesses
+Most reports of disease associations with COVID-19 have been case series.  There have been few reports based on evaluating these associations in the population through cohort or case-control studies.  With this matched case control design using incidence density sampling, we have been able to estimate rate ratios conditional on age and sex.  An unpublished analysis from England explored the association of similar set of risk conditions with in-hospital COVID-19 deaths, but did not systematically evaluate the rest of the medical record including prescription records.  Although we have records of encashment of prescriptions, we do not at present have access to other primary care data, which would contain additional information on morbidity and measurements such as body mass index.  A strength of our study however is that hospital discharge diagnoses are coded to ICD-10 by trained coders, in contrast to the coding systems used in primary care databases that do not map to recognized disease classifications.  Associations with ethnicity and other sociodemographic factors are not necessarily generalizable from Scotland to other populations.  
+
+# Conclusion
+This study confirms that risk of severe COVID-19 is associated with sociodemographic factors and with chronic conditions such as diabetes, asthma, circulatory disease and others. However the associations with pre-existing disease are not just with a small set of conditions that contribute to risk, but with many conditions as demonstrated by associations with past medical and prescribing history in relation to multiple physiological systems.  As countries attempt to emerge from lockdown whist protecting vulnerable individuals, multivariate classifiers rather than crude rule-based approaches will be needed to define those most at risk of developing severe disease.
+
+# Declarations
+## Information governance
+This study was conducted under approvals from the  Privacy Advisory Committee ref 44/13  and Public Benefit Privacy Protection amendment 1617-0147. Datasets were de-identified before analysis.  
+
+## Conflicts of interest
+The authors declare no conflicts of interest.
+
+## Acknowledgements
+We thank all staff in critical care units who submitted data to the SICSAG database, the Scottish Morbidity Record Data Team, the staff of the National Register of Scotland, the Public Health Scotland Terminology Services, the HPS COVID-19 Laboratory & Testing cell and the NHS Scotland Diagnostic Virology Laboratories, and Nicola Rowan (HPS) for coordinating this collaboration. 
+
+## Public Health Scotland COVID-19 Health Protection Study Group
+Alice Whettlock$^1$, Allan McLeod$^1$, Andrew Gasiorowski$^1$, Andrew Merrick$^1$, Andy McAuley$^1$, April Went$^1$, Calum Purdie$^1$, Colin Fischbacher$^1$, Colin Ramsay$^1$, David Bailey$^1$, David Henderson$^1$, Diogo Marques$^1$, Eisin McDonald$^1$, Genna Drennan$^1$, Graeme Gowans$^1$, Graeme Reid$^1$, Heather Murdoch$^1$, Jade Carruthers$^1$, Janet Fleming$^1$, Jade Carruthers$^1$, Joseph Jasperse$^1$, Josie Murray$^1$, Karen Heatlie$^1$, Lindsay Mathie$^1$, Lorraine Donaldson$^1$, Martin Paton$^1$, Martin Reid$^1$, Melissa Llano$^1$, Michelle Murphy-Hall$^1$, Paul Smith$^1$, Ros Hall$^1$, Ross Cameron$^1$, Susan Brownlie$^1$, Adam Gaffney$^2$, Aynsley Milne$^2$, Christopher Sullivan$^2$, Edward McArdle$^2$, Elaine Glass$^2$, Johanna Young$^2$, William Malcolm$^2$, Jodie McCoubrey $^2$
+
+1  Health Protection Scotland (Public Health Scotland), Meridian Court, 5 Cadogan Street, Glasgow G2 6QE. 
+
+2  NHS National Services Scotland, Meridian Court, 5 Cadogan Street, Glasgow G2 6QE. 
+
+## Supplementary material
+The R and Rmarkdown scripts used to generate this article, which include the code used to derive variables, will be made available with this manuscript. 
+
+# References
+
+<div id="refs"></div>
+\newpage
+
+# Figures
+
+```{r plotrates, echo=FALSE, fig.pos="H", fig.cap="\\label{fig:rates}Incidence of severe and fatal COVID-19 in Scotland by age and sex: generalized additive models fitted to severe and fatal cases for males and females separately", out.width="0.8\\textwidth"}
+
+breaks.gam <- c("1/20,000", "1/10,000", "1/5,000",
+                "1/2000", "1/1000", "1/500",
+                "1/200", "1/100")
+theme_set(
+    theme_gray(base_size = 14)
+)
+
+ggplot(data=gam, aes(x=Age, y=value, colour=Sex, linetype=Status)) +
+    geom_line() +
+    scale_x_continuous(name="Age", limits=c(20, 90),
+                       breaks=seq(20, 80, by=20),
+                       labels=seq(20, 80, by=20)) + 
+    scale_y_continuous(name="Risk (logit scale)",
+                       breaks=car::logit(c(5E-5, 1E-4, 2E-4,
+                                           5E-4, 1E-3, 2E-3,
+                                           5E-3, 1E-2)),
+                       labels=breaks.gam,
+                       limits=car::logit(c(2E-5, 5E-3)))
+```
+
+\newpage
+
+```{r plotwdists, echo=FALSE, fig.pos="H", fig.cap="\\label{fig:wevid}Cross-validation of model chosen by stepwise regression using extended variable set: class-conditional distributions of weight of evidence", out.width="0.8\\textwidth"}
+
+plotWdists(densities=full.densities, distlabels=c("Crude", "Adjusted")) +
+                                         theme_grey(base_size = 18) +
+                                         theme(legend.title=element_blank())
+
+```
+
+## Footnote for Figure \ref{fig:wevid} 
+For each individual, the risk prediction model outputs the posterior probability of being a case, which can also be expressed as the posterior odds. Dividing the posterior odds by the prior odds gives the likelihood ratio favouring case over non-case status for an individual.  The weight of evidence $W$ is the logarithm of this ratio. The  distributions of $W$ in cases and controls in the test data are plotted in Figure \ref{fig:wevid}.  For a classifier, the further apart these curves are, the better the predictive performance.  The expected information for discrimination $\Lambda$ is the average of the mean of the distribution of $W$ in cases and minus 1 times the mean of the distribution of $W$ in controls.  The distributions have been adjusted by taking a weighted average to make them mathematically consistent [@mckeigue_quantifying_2019]. 
+
+\newpage
+
+```{r plotroc, echo=FALSE, fig.pos='H', fig.cap="\\label{fig:roc}Cross-validation of model chosen by stepwise regression using extended variable set: receiver operating characteristic curve", out.width="0.8\\textwidth"}
+
+plotroc(full.densities) +
+    scale_color_manual(values=c("orange", "purple"), labels=c("Crude", "Adjusted")) + 
+    coord_fixed(ratio=1) +
+    theme(axis.title=element_text(size=18)) +
+    theme(legend.title=element_blank()) + 
+    theme(legend.position=c(0.8, 0.2)) + 
+    scale_x_reverse(limits=c(1, 0), expand=c(0, 0)) +
+    scale_y_continuous(limits=c(0, 1), expand=c(0, 0)) +
+    xlab("Specificity") +
+    ylab("Sensitivity (reverse scale)")
+
+```
+
+## Footnote for Figure \ref{fig:roc}
+The crude receiver operator characteristic (ROC) curve is computed by calculating at each value of the risk score the sensitivity and specificity of a classifier that uses this value as the threshold for classifying cases and non-cases.  The C-statistic is the area under this curve, computed as the probability of correctly classifying a case/noncase pair using the score, evaluated over all possible such pairs in the dataset.  
+
+\newpage
+
+# Tables
+```{r demog, echo=FALSE, warning=FALSE, message=FALSE}
+options(knitr.kable.NA = '')
+
+knitr::kable(table.demog.append[, 1:5],
+             escape=FALSE, 
+             booktabs=TRUE,
+             label="demog",
+             row.names=FALSE,
+             col.names=c("", clean.header(colnames(table.demog.aug)[1:2]),
+                         "Rate ratio (95\\% CI)", "$p$-value"),
+             align="lcccc", 
+             caption="Univariate associations of severe disease with demographic factors") %>%
+    column_spec(column=1, width="3cm") %>%
+    column_spec(column=2, width="2cm") %>%
+    column_spec(column=3, width="1.8cm") %>%
+    column_spec(column=4, width="2.5cm") %>%
+    group_rows("Ethnicity based on name classification", 1, 3, bold=FALSE) %>%
+    group_rows("SIMD quintile", 4, 8, bold=FALSE) %>%
+    group_rows("Ethnicity based on Scottish Morbidity Record", 10, 13, bold=FALSE,
+               hline_before=TRUE, latex_gap_space="10pt") %>% 
+    kable_styling(latex_options="hold_position") 
+
+```
+
+\newpage
+
+```{r agegr, echo=FALSE, warning=FALSE, message=FALSE}
+
+rownames(table.agegr) <- replace.names(rownames(table.agegr))
+table.agegr.print <- table.agegr[c(1:4, 6, 8:nrow(table.agegr)), ] 
+knitr::kable(table.agegr.print, 
+             escape=FALSE, 
+             booktabs=TRUE,
+             label="agegr",
+			 linesep=c(rep('', 4), '\\addlinespace', rep('', 9)), 
+             align=rep("c", 8), 
+             caption="Frequencies of risk factors in cases and controls, by age group") %>%
+    column_spec(column=1, width="4cm") %>%
+    column_spec(column=2:3, width="1.6cm") %>%
+    column_spec(column=4:7, width="1.8cm") %>%
+    column_spec(column=8:9, width="2cm") %>%
+    add_header_above(c(" "=1, "0-39 years"=2, "40-59 years"=2,
+                       "60-74 years"=2, "75+ years"=2)) %>%
+    landscape() %>%
+    kable_styling(latex_options="hold_position") 
+
+```
+
+```{r listed.conditions.allages, echo=FALSE, warning=FALSE, message=FALSE}
+
+knitr::kable(table.agegr.all[-4, ],
+             escape=FALSE, 
+             booktabs=TRUE,
+             label="listed.conditions.allages",
+             digits=c(0, 0, 0, 200, 0, 200), 
+             col.names=c(clean.header(colnames(table.agegr.all)[1:2]),
+                         "Rate ratio (95\\% CI)", "$p$-value",
+                         "Rate ratio (95\\% CI)", "$p$-value"),
+             align=rep("c", 6), 
+             caption="Associations of severe disease with listed conditions over all age groups") %>%
+    # group_rows(" ", 4, nrow(table.agegr.all[-4, ])) %>%
+    column_spec(column=1, width="5cm") %>%
+    column_spec(column=2:7, width="2.5cm") %>%
+    add_header_above(c(" "=3, "Univariate"=2, "Multivariate"=2)) %>%
+    landscape() %>%
+    kable_styling(latex_options="hold_position") 
+
+```
+
+```{r scripordiag.fatal, echo=FALSE, warning=FALSE, message=FALSE}
+
+knitr::kable(table.scripordiag.fatal, 
+             escape=FALSE, 
+             booktabs=TRUE,
+             label="fatal",
+             align=rep("c", 2), 
+             caption="Proportions of fatal cases and matched controls without and with a  dispensed prescription or hospital diagnosis, by age group") %>%
+   group_rows("Age <60", 1, 2) %>%
+   group_rows("Age 60-74", 3, 4) %>%
+   group_rows("Age 75+", 5, 6) %>%
+   kable_styling(latex_options="hold_position") 
+
+```
+
+```{r conditions, echo=FALSE, warning=FALSE, message=FALSE}
+
+rownames(table.conditions.aug) <- gsub("_", " ", rownames(table.conditions.aug))
+knitr::kable(table.conditions.aug,
+             escape=FALSE, 
+             booktabs=TRUE,
+             label="conditions",
+             digits=c(0, 0, 0, 200, 0, 200), 
+             col.names=c(clean.header(colnames(table.conditions.aug)[1:2]),
+                         "Rate ratio (95\\% CI)", "$p$-value",
+                         "Rate ratio (95\\% CI)", "$p$-value"),
+             align=rep("c", 6), 
+             caption="Associations of severe disease with hospital diagnoses in last 5 years, in those without any listed condition") %>%
+    column_spec(column=1, width="4cm") %>%
+    add_header_above(c(" "=3, "Univariate"=2, "Multivariate"=2)) %>%
+    landscape() %>%
+    kable_styling(latex_options="hold_position") 
+
+```
+
+```{r drugs, echo=FALSE, warning=FALSE, message=FALSE}
+
+rownames(table.drugs.aug) <- gsub("_", " ", rownames(table.drugs.aug))
+knitr::kable(table.drugs.aug,
+             escape=FALSE, 
+             booktabs=TRUE,
+             label="drugs",
+             digits=c(0, 0, 0, 200, 0, 200), 
+             col.names=c(clean.header(colnames(table.drugs.aug)[1:2]),
+                         "Rate ratio (95\\% CI)", "$p$-value",
+                         "Rate ratio (95\\% CI)", "$p$-value"),
+             align=rep("c", 6),
+             caption="Associations of severe disease with prescribed drugs in those without any listed condition") %>%
+    column_spec(column=1, width="4.5cm") %>%
+    add_header_above(c(" "=3, "Univariate"=2, "Multivariate"=2)) %>%
+    landscape() %>%
+    kable_styling(latex_options="hold_position") 
+```
+
+```{r infodiscrim, echo=FALSE, warning=FALSE, message=FALSE}
+
+rownames(table.densities) <- c("Demographic only",
+                               "Demographic + listed conditions",
+                               "Extended variable set")
+table.densities[, 6] <- round(table.densities[, 6] - table.densities[1, 6], 1)
+
+colnames(table.densities) <- gsub("Model-based", "Adjusted", colnames(table.densities))
+
+knitr::kable(table.densities, 
+             booktabs=TRUE,
+             escape=FALSE,
+              row.names=TRUE,
+             label="xvalid",
+             align=rep("c", 6),
+             caption="Prediction of severe COVID-19: cross-validation of models chosen by stepwise regression") %>%
+    column_spec(column=1, width="2.5cm") %>%
+    column_spec(column=2:7, width="1.4cm") %>%
+    kable_styling(latex_options="hold_position") 
+ 
+```
+
+\newpage
+\beginsupplement
+
+# Supplementary tables
+
+```{r listed.conditions.lt60, echo=FALSE, warning=FALSE, message=FALSE}
+
+knitr::kable(tables.agegr[[1]][-4, ],
+             escape=FALSE, 
+             booktabs=TRUE,
+             label="listed.conditions.lt60",
+             digits=c(0, 0, 0, 200, 0, 200), 
+             col.names=c(clean.header(colnames(tables.agegr[[1]])[1:2]),
+                         "Rate ratio (95\\% CI)", "$p$-value",
+                         "Rate ratio (95\\% CI)", "$p$-value"),
+             align=rep("c", 6), 
+             caption="Associations of severe disease with listed conditions in those aged less than 60") %>%
+#   group_rows(" ", 4, nrow(tables.agegr[[1]]) - 1) %>%
+    column_spec(column=1, width="4cm") %>%
+    column_spec(column=2:7, width="2.7cm") %>%
+   add_header_above(c(" "=3, "Univariate"=2, "Multivariate"=2)) %>%
+    landscape() %>%
+    kable_styling(latex_options="hold_position") 
+
+```
+
+```{r listed.condition.60to74, echo=FALSE, warning=FALSE, message=FALSE}
+
+knitr::kable(tables.agegr[[2]][-4, ],
+             escape=FALSE, 
+             booktabs=TRUE,
+             label="listed.conditions.60to74",
+             digits=c(0, 0, 0, 200, 0, 200), 
+             col.names=c(clean.header(colnames(tables.agegr[[2]])[1:2]),
+                         "Rate ratio (95\\% CI)", "$p$-value",
+                         "Rate ratio (95\\% CI)", "$p$-value"),
+             align=rep("c", 6), 
+             caption="Associations of severe disease with listed conditions in those aged 60-74 years") %>%
+ #   group_rows(" ", 4, nrow(tables.agegr[[2]]) - 1) %>%
+    column_spec(column=1, width="4cm") %>%
+    column_spec(column=2:7, width="2.7cm") %>%
+   add_header_above(c(" "=3, "Univariate"=2, "Multivariate"=2)) %>%
+    landscape() %>%
+    kable_styling(latex_options="hold_position") 
+
+```
+
+```{r listed.condition.75plus, echo=FALSE, warning=FALSE, message=FALSE}
+
+knitr::kable(tables.agegr[[3]][-4, ],
+             escape=FALSE, 
+             booktabs=TRUE,
+             label="listed.conditions.ge75",
+             digits=c(0, 0, 0, 200, 0, 200), 
+             col.names=c(clean.header(colnames(tables.agegr[[3]])[1:2]),
+                         "Rate ratio (95\\% CI)", "$p$-value",
+                         "Rate ratio (95\\% CI)", "$p$-value"),
+             align=rep("c", 6), 
+             caption="Associations of severe disease with listed conditions in those aged 75 years and over") %>%
+#    group_rows(" ", 4, nrow(tables.agegr[[3]]) - 1) %>%
+    column_spec(column=1, width="4cm") %>%
+   column_spec(column=2:7, width="2.7cm") %>%
+    add_header_above(c(" "=3, "Univariate"=2, "Multivariate"=2)) %>%
+    landscape() %>%
+    kable_styling(latex_options="hold_position") 
+
+```
+
+ 
+```{r agegr.withNRS, echo=FALSE, warning=FALSE, message=FALSE}
+
+table.agegr.withNRS <- readRDS(table.agegr, file="table.agegr.withNRS.rds")
+
+rownames(table.agegr.withNRS) <- replace.names(rownames(table.agegr.withNRS))
+table.agegr.withNRS.print <- table.agegr.withNRS[c(1:4, 6, 8:nrow(table.agegr.withNRS)), ] 
+knitr::kable(table.agegr.withNRS.print, 
+             escape=FALSE, 
+             booktabs=TRUE,
+             label="agegr.withNRS",
+			 linesep=c(rep('', 4), '\\addlinespace', rep('', 9)), 
+             align=rep("c", 8), 
+             caption="Frequencies of risk factors in cases and controls when deaths with mention of COVID-19 on the death certificate were included as cases, by age group") %>%
+    column_spec(column=1, width="4cm") %>%
+    column_spec(column=2:3, width="1.6cm") %>%
+    column_spec(column=4:7, width="1.8cm") %>%
+    column_spec(column=8:9, width="2cm") %>%
+    add_header_above(c(" "=1, "0-39 years"=2, "40-59 years"=2,
+                       "60-74 years"=2, "75+ years"=2)) %>%
+    landscape() %>%
+    kable_styling(latex_options="hold_position") 
+
+```
+
+```{r icdsubchapters, echo=FALSE, warning=FALSE, message=FALSE}
+clean.header <- function(x) {
+    x <- gsub("\\.\\.", " (", x)
+    x <- gsub("\\.",  ")", x)
+    return(x)
+}
+
+knitr::kable(table.icdsubchapters[grep("times", table.icdsubchapters$u.pvalue), ],
+             escape=FALSE, 
+             booktabs=TRUE,
+			 longtable=TRUE, 
+             label="icdsubchapters",
+             col.names=c(clean.header(colnames(table.icdsubchapters)[1:2]),
+                         "Rate ratio (95\\% CI)", "$p$-value"),
+             align=rep("c", 6), 
+             caption="Univariate associations of severe disease with hospital diagnoses by ICD subchapters in those without any listed conditions: rows retained are those with p < 0.001 and at least 50 cases and controls") %>%
+    column_spec(column=1, width="13cm") %>%
+    column_spec(column=2:3, width="1.5cm") %>%
+    column_spec(column=5, width="1.5cm") %>%
+    landscape() %>%
+    kable_styling(latex_options="hold_position") 
+
+```
+
+```{r model, echo=FALSE, warning=FALSE, message=FALSE}
+
+retained.full <- as.data.frame(stepwise.full[, c(1, 5)])
+retained.full[, 1] <- round(retained.full[, 1], 2)
+retained.full[, 2] <- signif(retained.full[, 2], 1)
+
+rownames(retained.full) <- gsub("\\.quintile", "\\.quintile ", rownames(retained.full))
+rownames(retained.full) <- gsub("([a-z])1", "\\1", rownames(retained.full))
+rownames(retained.full) <- gsub("care.home", "", rownames(retained.full))
+rownames(retained.full) <- gsub("dm\\.type", "", rownames(retained.full))
+
+rownames(retained.full) <- replace.names(rownames(retained.full))
+rownames(retained.full) <- gsub("\\_", " ", rownames(retained.full))
+
+retained.full[, 2] <- pvalue.latex(retained.full[, 2])
+
+knitr::kable(retained.full, 
+             booktabs=TRUE,
+             escape=FALSE,
+             label="stepwise",
+             col.names=c("log rate ratio", "$p$-value"), 
+             align=rep("c", 2),
+             caption="Stepwise regression: variables retained in model for severe disease") %>%
+    group_rows("SIMD - quintile 1 as reference", 2, 5, bold=FALSE) %>%
+    group_rows("Diabetes - non-diabetic as reference", 6, 8, bold=FALSE) %>%
+    kable_styling(latex_options="hold_position") 
+
+```
