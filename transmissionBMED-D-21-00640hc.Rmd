@@ -1,0 +1,583 @@
+---
+title: "Relation of severe COVID-19 in Scotland to transmission-related factors and risk conditions eligible for shielding support: REACT-SCOT case-control study"
+author:
+  - name: Paul M McKeigue\textsuperscript{\getAff{Usher}}
+    affiliation: HPS
+  - name: David A McAllister\textsuperscript{\getAff{Glasgow}}  
+    affiliation: HPS 
+  - name: David Caldwell 
+    affiliation: HPS
+  - name: Ciara Gribben
+    affiliation: HPS
+  - name: Jen Bishop
+    affiliation: HPS
+  - name: Stuart McGurnaghan
+    affiliation: IGMM
+  - name: Matthew Armstrong
+    affiliation: HPS
+  - name: Joke Delvaux
+    affiliation: HPS
+  - name: Sam Colville
+    affiliation: HPS
+  - name: Sharon Hutchinson\textsuperscript{\getAff{GCU}} 
+    affiliation: HPS
+  - name: Chris Robertson\textsuperscript{\getAff{Strathclyde}}   
+    affiliation: HPS
+  - name: Nazir Lone
+    affiliation: Usher
+  - name: Jim McMenamin 
+    affiliation: HPS
+  - name: David Goldberg
+    affiliation: HPS
+  - name: Helen M Colhoun\textsuperscript{\getAff{IGMM}}
+    corresponding: yes
+    email: helen.colhoun@igmm.ed.ac.uk
+    affiliation: HPS
+address: 
+- code: Usher
+  address: Usher Institute, College of Medicine and Veterinary Medicine, University of Edinburgh, Teviot Place, Edinburgh EH8 9AG, Scotland. PM - Professor of Genetic Epidemiology and Statistical Genetics. NL - Clinical Senior Lecturer in Critical Care  
+- code: HPS
+  address: Public Health Scotland, Meridian Court, 5 Cadogan Street, Glasgow G2 6QE
+- code: Glasgow
+  address: Institute of Health and Wellbeing, University of Glasgow, 1 Lilybank Gardens, Glasgow G12 8RZ. DM - Senior Clinical Lecturer in Public Health 
+- code: GCU
+  address: School of Health and Life Sciences, Glasgow Caledonian University. SH - Professor of Epidemiology and Population Health 
+- code: Strathclyde
+  address: Department of Mathematics and Statistics, University of Strathclyde, 16 Richmond Street, Glasgow G1 1XQ. CR - Professor of Public Health Epidemiology
+- code: IGMM
+  address: Institute of Genetics and Molecular Medicine, College of Medicine and Veterinary Medicine, University of Edinburgh, Western General Hospital Campus, Crewe Road, Edinburgh EH4 2XUC, Scotland. HC - AXA Chair in Medical Informatics and Epidemiology
+
+header-includes:
+  \usepackage{newunicodechar}
+  \let\origquote\quote
+  \def\quote{\origquote\itshape}
+  \usepackage{graphicx}
+  \usepackage{geometry}
+  \usepackage{longtable}
+  \usepackage{booktabs}
+  \usepackage{float}
+  \floatplacement{figure}{H}
+  \usepackage{array}
+  \usepackage{threeparttable}
+  \usepackage{longtable}
+  \usepackage{lscape}
+  \usepackage{pdfpages}
+  \usepackage{soul}
+  \linenumbers 
+output:
+  rticles::nejm_article:
+    includes:
+      in_header: ./preamble.tex
+    latex_engine: lualatex
+    keep_tex: true
+    fig_caption: yes
+#    number_sections: false
+    md_extensions: -autolink_bare_uris
+geometry: "left=2cm,right=2cm,top=2cm,bottom=2cm"
+bibliography: ./covid.bib
+csl: ./plos.csl
+always_allow_html: true
+urlcolor: blue
+linenumbers: false
+linkcolor: cyan
+
+---
+
+```{r functions, echo=FALSE}
+library(knitr)
+library(kableExtra)
+
+options(knitr.kable.NA = '.')
+options(knitr.table.format = "latex") # adds tab: prefix to labels
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+knitr::opts_chunk$set(fig.width=6, fig.pos = "H", out.extra = "")
+source("helperfunctions.R")
+
+dateformat <- function(x) { # format date and strip leading zero
+     gsub("^0", "", format(x, "%d %B %Y"))
+}
+
+format.estcipv <- function(x.ci, x.pval) {
+    x <- gsub(" \\(", " \\(95\\% CI ", as.character(x.ci))
+    x <- gsub(", ", " to ", x)
+    x <- gsub("\\)", paste0(", _p_=\\", x.pval, "\\)"), x)
+    x <- gsub("=<", "<", x)
+    x <- gsub("times", "\\\\times", x)
+    return(x)
+}
+
+format.estci <- function(x.ci) {
+    x <- gsub(" \\(", " \\(95\\% CI ", as.character(x.ci))
+    x <- gsub(", ", " to ", x)
+    #x <- gsub("\\)", paste0(", _p_=\\", x.pval, "\\)"), x)
+    #x <- gsub("times", "\\\\times", x)
+    return(x)
+}
+
+peakdate <- casedates.allgr[which.max(avdaily), date]
+maxdeaths <- casedates.allgr[which.max(avdaily), avdaily]
+deaths.quartermax.date <- casedates.allgr[date > peakdate & avdaily < 0.25 * maxdeaths,
+                                 date][1]
+
+peakdate.elig <- casedates.byelig[listedgr3=="Eligible for shielding"][which.max(avdaily), date]
+maxdeaths.elig <- casedates.byelig[listedgr3=="Eligible for shielding"][which.max(avdaily), avdaily]
+deaths.elig.quartermax.date <- casedates.byelig[listedgr3=="Eligible for shielding" &
+                                         date > peakdate.elig &
+                                         avdaily < 0.25 * maxdeaths.elig,
+                                         date][1]
+
+r <- as.numeric(gsub(" .*", "", table.shieldedonly.severecases.nocare["Recent hospital visit/stay", 3])); 
+
+pc <- gsub(".*\\(", "", table.shieldedonly.severecases.nocare["Recent hospital visit/stay", 2])
+pc <- 0.01 * as.numeric(gsub("\\\\.*", "", pc))
+
+r.all <- as.numeric(gsub(" .*", "", table.shielded.severecases.nocare["Recent hospital visit/stay", 3])); 
+
+pc.all <- gsub(".*\\(", "", table.shielded.severecases.nocare["Recent hospital visit/stay", 2])
+pc.all <- 0.01 * as.numeric(gsub("\\\\.*", "", pc.all))
+
+table.testpos <- paste.rowpercent(with(cc.severe[CASE==1], 
+table(SPECIMENDATE > as.Date("2020-08-31"), testpositive.case)))
+
+```
+\nolinenumbers
+
+Word counts: abstract 350 words, main text 5771 words.  
+2 figures, 4 tables, 26 references
+
+Keywords: COVID-19 / prevention & control; Transplant Recipient; Nosocomial Infection; Matched Case Control Studies. 
+
+\newpage
+
+# Abstract  
+* _Background_ -  Clinically vulnerable individuals have been advised to shield themselves during the COVID-19 epidemic.  The objectives of this study were to investigate:  1) the rate ratio of severe COVID-19  associated with eligibility for  the shielding programme in Scotland across the first and second waves of the epidemic, and (2) the relation of severe COVID-19 to transmission-related factors in those in shielding and the general population”.
+* _Methods_ -  In a matched case-control design, all `r nrow(cc.all[CASE==1])` diagnosed cases of COVID-19 in Scotland from 1 March 2020 to `r dateformat(lastdate.specimen)` were matched for age, sex and primary care practice to `r nrow(cc.all[CASE==0])` controls from the general population.  This dataset (REACT-SCOT) was  linked to the list of `r nrow(shielded.full)` individuals identified as eligible for shielding.  Severe COVID-19 was defined as cases that entered critical care or were fatal. Rate ratios were estimated by conditional logistic regression.  
+* _Results_ - With those without risk conditions as reference category, the univariate rate ratio for severe COVID-19 was `r format.estci(table.listedgr3.severecases.nocare["Moderate risk condition", 3])` in those with moderate risk conditions and 
+`r format.estci(table.listedgr3.severecases.nocare["Eligible for shielding", 3])` 
+in those eligible for shielding.  The highest rate was in solid organ transplant recipients: rate ratio `r format.estci(table.shielded.severecases.nocare["Solid organ transplant", 3])`.  Risk of severe COVID-19 increased with the number of adults but decreased with the number of school-age children in the household. Severe COVID-19 was strongly associated with recent exposure to hospital (defined as 5 to 14 days before presentation date): rate ratio `r format.estci(table.shielded.severecases.nocare["Recent hospital visit/stay", 3])`  overall.   The population attributable risk fraction for recent exposure to hospital peaked at  `r round(100 * coeffs.hosp.timewindow[date==as.Date("2020-05-01"), popattr.frac])`% in May 2020 and again at `r round(100 * coeffs.hosp.timewindow[date==as.Date("2020-12-01"), popattr.frac])`%  in December 2020.  
+* _Conclusions_ -  The effectiveness of shielding vulnerable individuals was limited by the inability to control transmission in hospital and from other adults in the household. Mitigating the impact of the epidemic requires control of nosocomial transmission.  
+
+\newpage
+\linenumbers
+
+# Background
+The SARS-CoV-2 pandemic reached Scotland in early 2020 with the first positive laboratory test recorded on 1 March 2020. Population-wide interventions included advice that symptomatic individuals should self-isolate, banning of mass gatherings, closure of schools and finally a population-wide lockdown on 23 March 2020.  Although no systematic studies of risk factors were available at that time, public health agencies issued lists of "moderate risk" conditions [@nhs_whos_2020] and "diseases and conditions considered to be very high risk" [@kanani_caring_2020].  Those with "very high risk" conditions were designated as eligible for shielding, and were sent letters advising strict isolation, even from other members of the same household,  and offering support which included a national opt-in scheme of free food delivery, home delivery of medication and priority access to supermarket delivery slots. Those living in multiple-occupancy households were advised to isolate from other household members. Compliance was voluntary.  
+
+For this study the research question was to investigate the effectiveness of the shielding programme individuals and to identify avoidable factors that might have limited the effectiveness of this focused protection of vulnerable individuals. The original aim was to  investigate whether shielding advice and support had reduced the risk of COVID-19.  The first objective was to quantify the incidence of severe COVID-19 in those eligible for shielding and to determine whether the rate ratio associated with eligibility for  shielding  compared to those without risk conditions had fallen after the receipt of shielding letters. The second objective was to understand the relation of severe COVID-19 in those eligible for shielding to transmission-related factors including household composition and recent exposure to hospital.  As the relevance of these transmission-related factors among those eligible for shielding  became clear, the aims were broadened to investigate the relation of severe COVID-19 to these transmission-related factors in  the general population.  
+
+# Methods
+## Overview
+## Registration
+The original protocol for the REACT-SCOT case-control study was registered with the European Network of Centres for Pharmacoepidemiology and Pharmacovigilance (ENCEPP number EUPAS35558).
+We linked a national dataset of those eligible for shielding to a case-control dataset (REACT-SCOT) established in Public Health Scotland (PHS) that includes all persons diagnosed with COVID-19 in Scotland.  Each case was matched to up to 10 controls of the same sex and in the same one-year age band, registered with the same primary care practice and not previously diagnosed with COVID-19, who were alive on the date of presentation of the case controls.[@mckeigue_rapid_2020]  This case-control dataset is refreshed every few weeks and linked to health records that are used to assign a list of designated "moderate risk conditions". Thus all cases and controls were classified into three categories: no risk condition, moderate risk condition only, eligible for shielding.  As a first step we report the cumulative incidence of diagnosed COVID-19 among those in shielding.  For all tests of association and comparisons of rates between groups we limit the analysis to severe  cases and their respective controls as described below, and we exclude care home residents. 
+
+The study period was from 1 March 2020 (the date of the first case in Scotland ) to 18 February 2021 (date of the latest data extract available for this study). Thus it predates the start of the shielding programme. 
+
+## Ascertainment of eligibility for shielding 
+The list of those eligible for shielding was generated by Public Health Scotland from March 2020 onwards by querying health-care information systems including hospital discharge records, prescription encashments, regional cancer chemotherapy databases, blood and transplant registries, for a designated list of diseases and conditions, supplemented direct requests to clinicians in relevant specialties [@health_protection_scotland_search_2020].  The categories designated as eligible for shielding were as listed below [@health_protection_scotland_search_2020; @kanani_caring_2020]: 
+
+1. Solid organ transplant recipient
+2. Cancer of the blood or bone marrow at any stage of treatment, or people with cancer receiving treatments that affect the immune system 
+3. Severe respiratory conditions including cystic fibrosis, severe asthma and severe chronic obstructive airway disease, on home oxygen, severe bronchiectasis, pulmonary hypertension)
+4. Rare diseases that increase the risk of infections such as severe combined immunodeficiency, homozygous sickle-cell disease. 
+5. People on immunosuppression therapies sufficient to increase risk of infection
+6. Pregnant with heart disease
+7. Additional conditions, including people on renal dialysis, those who had had a splenectomy  and others identified by clinicians as requiring shielding advice. 
+
+The first batch of  shielding letters was sent on `r dateformat(batches$Date.Sent)[1]`.   Further batches were issued on a weekly basis and the programme was paused on  1 August 2020. On 25 November 2020 a further letter was issued with "extra protection level advice for people at highest risk" based on the current protection level for the population level in that area.   The list of those eligible for shielding has been regularly updated: this study is based on the list of `r nrow(shielded.full)` individuals identified up to 28 January 2021. 
+
+## Ascertainment of cases and sampling of controls
+Case ascertainment for the REACT-SCOT study has been described in detail elsewhere [@mckeigue_rapid_2020].  Case ascertainment was based on querying the following national-level databases: Electronic Communication of Surveillance in Scotland (ECOSS) that captures virology testing in all NHS laboratories, National Records of Scotland (NRS) death registrations,  RAPID which is a daily update of hospitalisations, and Scottish Morbidity Record 01 (SMR01) which records general hospital discharges including day cases and is ICD-10 coded. All these databases use the Community Health Index (CHI) number as identifier.  The CHI database includes age, sex, postcode and care home status, and can be queried to extract numbers of adults and children in the household. 
+
+Cases diagnosed with COVID-19 were defined as those with a positive  nucleic acid test for SARS-CoV-2 in ECOSS, a hospital discharge diagnosis of COVID-19 in SMR01, or a death registration with mention of COVID-19 anywhere on the death certificate. Thus not all those  cases defined as having evidence of COVID-19  had a positive test. To restrict cases to those with a positive test would have missed a large proportion of deaths in the first wave as the availability of tests was restricted.  Some cases with a definite clinical diagnosis of COVID-19 based on typical presentation and radiological signs nonetheless tested negative when they presented late in their illness.  In  the first wave (up end of August 2020), only `r table.testpos[1, 2]` of the severe cases were test-positive; in the second wave beginning on 1 September 2020, `r table.testpos[2, 2]` were test-positive. 
+
+The presentation date was assigned as the date of the first positive test for those ascertained through testing, as seven days before the admission date for those without a positive test result ascertained through hospital discharge records, and as fourteen days before the date of death for those without a positive test result ascertained through death certificates. Databases were queried from 1 March 2020  (date of the first diagnosed case of COVID-19 in Scotland) up to `r dateformat(lastdate.specimen)` for test results and `r dateformat(maxdate.death)` for deaths.  For each case  diagnosed with COVID-19, up to 10  community controls matched for sex, one-year age band and primary care practice were selected from the CHI database, and assigned the same presentation date as the case. With this incidence density sampling design, it is possible and correct for an individual to appear more than once as a control and subsequently as a case. As primary care practice catchment areas are localized, matching on primary care practice matches for geographic factors also.  
+s
+### Inclusion and exclusion criteria for analyses 
+We reported the cumulative incidence of diagnosed COVID-19 in the shielded and further categorised these cases into those that required critical care or were fatal or not.   We defined severe COVID-19 as those diagnosed with COVID-19 who also required  entry to critical care within 21 days of presentation date, or had a fatal outcome.   Entry to critical care units -- intensive care, high dependency or combined units -- was obtained by linkage to the Scottish Intensive Care Society and Audit Group (SICSAG) database.  Fatal outcome was defined as death at any time with COVID-19 coded as underlying cause, death from any cause within 28 days of testing positive or death within 28 days of presentation date for cases ascertained only through discharge records.  
+
+For all subsequent tests of association and comparisons of rates between groups presented here, we restricted the dataset to cases with severe COVID-19 and their matched controls from the population.  The narrow definition of severe COVID-19 was defined as the main outcome measure of the REACT-SCOT study at the design stage, to ensure that ascertainment would not be biased by variation in testing policies or selection for hospitalisation.  In the first wave in Scotland people with symptoms were advised to stay at home and not to seek testing or attend hospital unless their condition deteriorated.  A broader case definition based on test-positive or hospitalized cases would have given rise to selection bias if, for equivalent severity of symptoms, those with pre-existing risk conditions were more likely to be tested or hospitalised than those without pre-existing risk conditions.  For all tests of association and comparisons of rates between groups other than the initial tabulation of cumulative incidence of any diagnosis of COVID-19 in the shielded,  we excluded care home residents because policies for shielding  care home residents are different from those relevant to shielding individuals living independently.  
+
+## Linkage of cases and controls to demographic and morbidity data
+Linkage of cases and controls to demographic and morbidity data and the associations of these factors with severe COVID-19 have been described in detail elsewhere [@mckeigue_rapid_2020].  Cases and controls were linked to hospital discharge ICD-10 codes over the last five years in SMR01, to British National Formulary codes of dispensed prescriptions in the 240 days before presentation date in the Prescribing Information System and to the national register of diabetes.  We used these linked datasets to assign a list of "moderate risk conditions" for COVID-19 designated by public health agencies [@nhs_whos_2020]: diabetes, heart disease, asthma or chronic airway disease, chronic kidney disease, disabling neurological conditions, and immune deficiency or suppression.  The codes used are as described previously  [@mckeigue_rapid_2020].  Three broad risk groups were defined: no risk condition, moderate risk condition but ineligible for shielding, and eligible for shielding.  Socioeconomic status was assigned as the Scottish Index of Multiple Deprivation (SIMD) score which is based on linkage of postcodes to Census data [@fraser_scottish_2020]; quintile 5 is the least deprived.  
+
+## Transmission-related risk factors 
+As addresses in the CHI database have been mapped to Unique Property Reference Numbers it was possible to calculate the numbers of adults and children in each household and to augment the coding of care home residence in the CHI database.  Care home residence was assigned using the field in the CHI database, augmented by coding as care home residents the `r care.home.reclassified[1]` individuals aged over 70 in households with 10 or more adults to give a total of `r cc.all[care.home=="Care/nursing home", .N]` care home residents out of the `r cc.all[, .N]` cases and controls.  Linkage to occupational status for health-care workers and teachers was undertaken as described elsewhere [@shah_risk_2020; @mcallister_report_2020].
+
+We used the Scottish Morbidity Records SMR01 (inpatients and day cases) and SMR00 (outpatient attendance) together with the RAPID database to derive variables encoding recent exposure to hospitals. We defined the variable "recent hospital exposure" as any hospital in-patient stay, day case attendance or face-to-face out-patient consultation from 5 to 14 days before presentation date. Restriction of hospital exposure to this time window was intended to exclude consultations caused by COVID-19 symptoms for which testing was delayed by a few days, but to include those exposed to health care facilities in the time interval during which the infection was likely to have been acquired. In Scotland people with COVID-19 symptoms were instructed not to visit hospitals, to attend designated test centres for testing within 3 days, and to call an emergency number for admission if their symptoms worsened.  It is therefore unlikely that hospital visits by people with COVID-19 symptoms could account for the association of first positive tests 5-6 days before. As the average incubation period for COVID-19 is 5-6 days [@dhouib_incubation_2021], exposure in the time window is relevant.   
+
+Our intention was to capture all relevant exposure in cases and controls, rather than to assign individual cases as "health-care associated COVID-19" as specified by the European Centre for Disease Prevention and Control (ECDC) [@european_centre_for_disease_prevention_and_control_surveillance_2020].  The ECDC definition of probable/definite health-care associated COVID-19 is restricted to those who have been in hospital for at least 8 days before first developing symptoms: all other cases are classified as community onset.  The definition of "recent hospital exposure" used in this study was intended to capture all those whose infection could have been acquired in hospital (sensitivity of 1), unlike the ECDC definition of "probable/definite health-care associated infection" which is intended to identify those whose infection was unlikely to have been acquired outside hospital (high specificity).  Because this study includes a control group, the calculation of the population attributable risk fraction is valid if the classification of exposure has sensitivity of 1 even if the specificity is less than 1 [@hsieh_effect_1988].  For estimating the population attributable risk fraction, it is therefore appropriate to use an inclusive definition of exposure, even if this includes some individuals whose infection was not acquired in hospital.  
+
+## Statistical methods
+Other than the cumulative incidence analyses the analyses presented here focus on severe COVID-19,  and their respective controls. For the matched case-control analyses, severe cases and their respective controls were censored at date of first vaccination.  
+
+Among all severe cases and controls, conditional odds ratios for severe COVID-19 associated with eligibility for shielding and for other moderate risk conditions were calculated with "no risk condition" as reference category using conditional logistic regression.  With this  incidence density design the conditional odds ratios are equivalent to rate ratios so are referred to as such throughout the manuscript.  As the  community controls were drawn by incidence density sampling and matched for age, sex, and general practice, the conditional logistic regression inherently controls for these variables and for calendar time.   Conditional logistic regression was also used to test for association of  transmission-related factors with severe COVID-19.  These transmission-related factors were chosen *a priori* as factors that would plausibly constrain the extent to which individuals were able to limit their exposure to infection: the need for hospital care, deprivation score since it may relate to overcrowding or the economic imperative to work, number of persons in the household and usual occupation.  A multivariable model  was used to adjust for shielding condition, moderate risk condition and transmission-related factors  simultaneously.  These analyses were repeated restricted to those eligible for shielding. The multivariable analyses in Tables 2 and 3 are simultaneously adjusted for all variables shown in the table.
+
+To plot the time course of the rate ratios for severe COVID-19  associated with eligibility for shielding and with hospital exposure, these rate ratios were estimated over `r winsize`-day sliding windows of calendar time.  The population attributable risk fraction of severe cases for hospital exposure was calculated in each 21-day time window from Miettinen's formula as \ensuremath{p_c \left( r - 1 \right) / r}.  where \ensuremath{p_c} is the frequency of exposure in cases and \ensuremath{r} is the rate ratio [@hsieh_effect_1988]. 
+
+Sliding windows of size  `r winsize.casedates`, `r winsize.hosp`, and `r winsize` days were used to plot the number of severe cases, the frequency of recent hospital exposure, and the rate ratios associated with hospital exposure and household composition.  In the plots of exposure frequency and rate ratio the data points from 1 June 2020 to 30 September 2020 were omitted as the numbers of severe cases and controls were too low for estimates of frequencies and rate ratios to be accurate.  
+
+To test for causality of the association of recent exposure to hospital with severe COVID-19, we estimated the conditional odds ratios associated with recent hospital exposure (5 to 14 days before first testing positive) with less recent exposure (15 to 24 days before first testing positive) as reference category. This analysis was restricted to test-positive severe cases and their matched controls, so that it does not rely on the imputed presentation dates that were assigned to test-negative cases. The classic case-crossover design compares in cases only the frequencies of exposure in recent and less recent time windows, and estimates the conditional odds ratio as the ratio of number of cases with recent exposure only to number of cases with less recent exposure only. This can be viewed as a matched-pairs case-control study in which the case and control are the same person in recent and less recent time windows [@maclure_should_2000]. The analysis that we report is a refinement that takes advantage of the availability of a matched control group to estimate the rate ratio for severe COVID-19 associated with exposure only in a recent time window, with those exposed only in a less recent time window as the reference category. This controls for any difference in the population frequencies of exposure or disease incidence between recent and less recent time windows.
+
+# Results
+## Shielding eligibility and risk of COVID-19
+Additional File: Table \ref{tab:shieldgroupsbyage} shows the frequency of risk categories in those eligible for shielding.  To comply with statistical disclosure control rules, the `r shielded.full[shield.group=="Pregnant with heart disease", .N]` women in the category "pregnant with heart disease" have been allocated to the "Additional conditions" category; there were no severe cases in this group.  Table \ref{tab:shieldcasegroup} shows the number in each category of eligibility for shielding by case status classified as not diagnosed, not severe or severe COVID-19; among `r nrow(shielded.full)` persons eligible  for shielding `r table.shield.casegr["All shielding categories", 2]` were diagnosed with COVID-19 but did not enter critical care or die within 28 days, `r table.shield.casegr["All shielding categories", 3]` entered critical care for COVID-19 but survived, and `r table.shield.casegr["All shielding categories", 4]` had a fatal outcome.    As shown in Figure \ref{fig:plotcasesbydate} the time course of  frequency of daily severe cases in those eligible for shielding  broadly paralleled the time course in those without risk conditions.  Of the `r cc.severe[CASE==1 & shield.any==TRUE, .N]` severe cases among those eligible for shielding, `r cc.severe[CASE==1 & shield.any==TRUE, .N, by=care.home][care.home=="Care/nursing home", N]` were resident in care homes.  
+
+## Rate ratios for severe COVID-19  by risk group   
+Table \ref{tab:regressionseverecasesnocare} shows the rate ratios for severe COVID-19 associated with each category of shielding eligibility, with those without risk conditions as reference category, excluding care home residents.  The univariate rate ratio for severe disease was
+`r format.estcipv(table.listedgr3.severecases.nocare["Moderate risk condition", 3], table.listedgr3.severecases.nocare["Moderate risk condition", 4])` 
+in those with moderate risk conditions and 
+`r format.estcipv(table.listedgr3.severecases.nocare["Eligible for shielding", 3], table.listedgr3.severecases.nocare["Eligible for shielding", 4])` 
+in those eligible for shielding. The rate ratio associated with eligibility for shielding was 
+`r format.estci(table.listedgr3.wave1["Eligible for shielding", 3])` up to the end of August 2020 and `r format.estci(table.listedgr3.wave2["Eligible for shielding", 3])` after August 2020.  
+
+Among those eligible for shielding, solid organ transplant recipients were the group at highest risk, with a univariate rate ratio of  `r format.estcipv(table.shielded.severecases.nocare["Solid organ transplant", 3], table.shielded.severecases.nocare["Solid organ transplant", 4])` for severe COVID-19.    On multivariable adjustment for the covariates shown in Table \ref{tab:regressionseverecasesnocare} the rate ratios for all these shielding groups remained high. 
+
+We examined the time course of the rate ratio associated with eligibility for shielding.  As shown in Additional File: Table \ref{tab:letterdates} most of the solid organ transplant recipients, those with severe respiratory disease, and cancer patients were included in the first batch of  shielding letters sent on 3 April 2020.  Additional File: Figure \ref{fig:plotrateratio}(a) shows that the rate ratio associated with eligibility for shielding   increased from `r round(coeffs.long[date.midpoint==as.Date("2020-04-01") & riskgroup=="Eligible for shielding", rateratio], 2)` in the time window with mid-point 1 April to `r round(coeffs.long[date.midpoint==as.Date("2020-05-01") & riskgroup=="Eligible for shielding", rateratio], 2)` in the time window with mid-point 1 May.  The rate ratio associated with moderate risk conditions also rose in the first half of May, but fell more rapidly than the rate ratio associated with eligibility for shielding. Thus there was no evidence that shielding advice reduced the rate ratio. 
+
+## Associations of severe COVID-19 with transmission-related factors
+### Associations in those eligible for shielding 
+Table \ref{tab:shieldedonlyregressionseverecasesnocare} shows associations with risk factors among those eligible for shielding only, with severe respiratory disease (the largest category) as reference category.  The rate ratio increased with the number of adults in the household but not with the number of children.  The strongest risk factor for severe COVID-19 among those eligible for shielding was recent exposure to hospital, with a rate ratio of `r format.estcipv(table.shieldedonly.severecases.nocare["Recent hospital visit/stay", 5], table.shieldedonly.severecases.nocare["Recent hospital visit/stay", 6])` in the multivariable model which all the covariates shown n the table were entered simultaneously.  Of severe cases among those eligible for shielding, `r table.shieldedonly.severecases.nocare["Recent hospital visit/stay", 2]` had recent  exposure to hospital. Using Miettinen's formula as given above, the population attributable risk fraction for recent  exposure to hospital in those eligible for shielding can thus be calculated as `r round(100 * pc * (r -1) / r)`% of severe cases.  
+
+### Associations in the overall population 
+Table \ref{tab:regressionseverecasesnocare}  shows the association of severe COVID-19 with risk factors in the general  population,  including those eligible for shielding but excluding residents in care homes.  The risk of severe COVID-19 increased with the number of adults in the household, but was inversely associated with the number of school-age children in the household in a  multivariable model in which all the covariates in Table \ref{tab:regressionseverecasesnocare} were entered simultaneously. The rate ratio associated with two or more adults (with single-adult households as reference category), was   `r format.estcipv(table.listedgr3.severecases.nocare["adultsgt1", 5], table.listedgr3.severecases.nocare["adultsgt1", 6])` and the rate ratio associated with one or more school-age children was `r format.estcipv(table.listedgr3.severecases.nocare.anyschoolage["hh.schoolage.any", 5], table.listedgr3.severecases.nocare.anyschoolage["hh.schoolage.any", 6])`.   The other demographic factor associated with increased risk was socioeconomic deprivation: the rate ratio in the least deprived quintile compared with the most deprived quintile was `r format.estcipv(table.shielded.severecases.nocare["5 - least deprived", 5], table.shielded.severecases.nocare["5 - least deprived", 6])`.   As shown in Additional File: Figure \ref{fig:plotrateratio}(b), in a joint model with number of adults in household, number of children in household, and SIMD deprivation score the rate ratio for severe disease per adult in household remained in the range 1.5 to 2 throughout the epidemic, and the rate ratio per school-age child in household remained mostly in the range 0.7 to 1. 
+
+As reported previously, in comparison with other occupations patient-facing health-care workers were at higher risk of severe disease with a rate ratio of `r format.estcipv(table.shielded.severecases.nocare["Health care PF", 3], table.shielded.severecases.nocare["Health care PF", 4])`, and teachers were at lower risk with a rate ratio of `r format.estcipv(table.shielded.severecases.nocare["Teacher", 3], table.shielded.severecases.nocare["Teacher", 4])`.  
+
+#### Association with recent exposure to hospital
+As Table \ref{tab:regressionseverecasesnocare} shows, the strongest risk factor (in terms of deviance explained) for severe COVID-19 in the overall population was recent exposure to hospital: rate ratio `r format.estcipv(table.shielded.severecases.nocare["Recent hospital visit/stay", 3], table.shielded.severecases.nocare["Recent hospital visit/stay", 4])`.   Exclusion of the `r round(100 * with(cc.all[testpositive.case & deathwithin28], table(covid_ucod)[1] / sum(table(covid_ucod))))`% of those dying within 28 days of a positive test who did not have  COVID-19 as underlying cause of death on their death certificates changed this rate ratio only slightly to `r testpos.coeffs["Recent hospital visit/stay", 3]`. 
+
+Figure \ref{fig:plotexphosp}(a) shows the time course of the frequency of recent exposure to hospital using data from controls;    for monitoring background exposure levels it is appropriate to examine the frequency in controls rather than in cases.  Recent exposure  to hospital fell  precipitously when restrictions on non-COVID-19 admission were imposed in March, but remained higher in those eligible for shielding than in those with moderate risk conditions or no risk conditions throughout. 
+
+As shown in Figure \ref{fig:plotexphosp}(b)  the rate ratio associated with recent exposure to hospital  increased from `r round(coeffs.hosp.timewindow[date==as.Date("2020-04-01"), rateratio], 1)` in the time window with mid-point 1 April to a rate ratio of `r round(coeffs.hosp.timewindow[date==as.Date("2020-05-01"), rateratio], 0)` in the time window with mid-point 1 May. 
+
+The population attributable risk fraction of severe COVID-19 for recent  exposure to hospital in the general population can be calculated as `r round(100 * pc.all * (r.all - 1) / r.all)`% over the study period.   This fraction reached a peak in the first wave of `r round(100 * coeffs.hosp.timewindow[date==as.Date("2020-05-01"), popattr.frac])`%  of severe cases at the beginning of May, declined rapidly over the next few weeks, and increased again to `r round(100 * coeffs.hosp.timewindow[date==as.Date("2020-12-01"), popattr.frac])`%  of severe cases at the beginning of December (Figure \ref{fig:plotexphosp}(c)). 
+
+In a _post hoc_ analysis we found that the association of recent exposure to hospital with severe disease was largely driven by inpatient exposure [rate ratio `r format.estcipv(table.rapid.coeffs["rapid.recent", 3], table.rapid.coeffs["rapid.recent", 4])`]; the  rate ratios associated with day case exposure [`r format.estcipv(table.daycase.coeffs["daycase.recent", 3], table.daycase.coeffs["daycase.recent", 4])`] or outpatient exposure  [`r format.estcipv(table.opd.coeffs["opd.recent", 3], table.opd.coeffs["opd.recent", 4])`]  were  much lower.   To test if the association of severe COVID-19 with recent inpatient exposure was likely to simply reflect  confounding by time invariant comorbidity, the association was examined by time window as described in the Methods section. Table \ref{tab:timewindow} shows that the rate ratio for severe COVID-19 associated with inpatient exposure only in the recent interval (days 5 to 14 before testing positive), with exposure only in the less recent interval (days 15 to 24 before testing positive) as reference category was `r format.estcipv(table.tw["Recent.TW.only", 4],table.tw["Recent.TW.only", 5])`.   
+
+The frequency of recent inpatient exposure over the period of study in cases not resident in care homes was `r round(100 * p.rapid)`%.  From this and the  rate ratio of `r round(r.rapid, 1)` given above the population attributable risk fraction for recent hospital inpatient exposure  can be calculated from Miettinen's formula as `r round(100 * parf.rapid)`%.  As Table \ref{tab:hcai_rapid}, shows, most of the difference in inpatient exposure classification of severe cases between our definition and the ECDC definition arises because cases with onset after hospital discharge  would be classified as community onset by the ECDC classification:  only `r x <- with(cc.severe[CASE==1 & rapid.recent], table(hcai, rapid.recent)); round(100 * sum(x[4:5]) / sum(x))`% of severe cases with inpatient exposure 5-14 days before COVID-19 presentation would be defined as probable or definite hospital-acquired infection (in hospital for at least 8 days before first testing positive) by the ECDC classification.  The rate ratio for severe disease  associated with being in hospital for at least 8 days before presentation date was `r round(r.hcai, 1)`.  
+
+# Discussion  
+## Summary of findings and comparison with other studies
+Key findings of this study were: (1) that the rate ratios for severe COVID-19 associated with shielding conditions remained high through the epidemic; (2) that recent hospital exposure and  the number of adults in the household were associated with severe COVID-19 among those eligible for shielding and also in the general population; (3) that among those not resident in care homes the proportion of severe cases attributable to hospital attendance reached a peak of `r round(100 * coeffs.hosp.timewindow[date==as.Date("2020-12-01"), popattr.frac])`% during the second wave.
+
+### Risk to those eligible for shielding
+In  comparison with those with no risk condition, the highest rate ratio for severe COVID-19 was the `r round(as.numeric(gsub(" .*", "", table.shielded.severecases.nocare["Solid organ transplant", 3])))`-fold rate ratio in solid organ transplant recipients. For other conditions deemed eligible for shielding, the rate ratios were between `r round(min(as.numeric(gsub(" .+", "", table.shielded.severecases.nocare[4:8, 3]))))` and `r round(max(as.numeric(gsub(" .+", "", table.shielded.severecases.nocare[4:8, 3]))))`, compared to the rate ratio of about `r round(as.numeric(gsub(" .+", "", table.shielded.severecases.nocare[2, 3])))` associated with conditions designated as moderate risk, which include heart disease, diabetes, chronic kidney disease and disabling neurological conditions.  The numbers of pregnant women with heart disease were too small for the risk in this group to be estimated. Other studies of outcome of COVID-19 in solid organ transplant recipients and other individuals using immunosuppressants have been based only on patients admitted to hospital [@avery_inpatient_2020; @andersen_association_2021]. Such studies cannot assess the risks to immunosuppressed individuals in the population.  
+
+The shielding programme was introduced at a time when general social distancing measures were being introduced and after the first lockdown had started. We had hypothesised *a priori* that a fall in the rate ratio for severe disease associated with eligibility for shielding  within two weeks of the first letters being sent out would be consistent with the  shielding  programme having some impact beyond the population-wide lockdown that had been imposed by this time. However we did not find this; while presentations of severe cases fell rapidly in the general population from the beginning of April 2020, the fall in presentations among those eligible for shielding advice was delayed so that the rate ratio for severe COVID-19 associated with eligibility for shielding rose during April 2020.  Daily deaths fell during April 2020 both in those eligible and those ineligible for shielding.  As a lockdown on the general population had been imposed on 23 March 2020, and individuals who considered themselves to be at high risk would have been likely to reduce their contact level before then, there were limited possibilities for risk in this group to be reduced further by advice to shield and offers of help in letters sent from 3 April onwards.  
+
+Although we did not find any evidence that the shielding programme *per se* reduced COVID-19 rates, it is possible that without shielding advice and support the outcome in this group would have been worse.  It is still relevant to examine why advice to shield, combined with offers of support for delivery of food and medicines, failed to protect some individuals who were identified as clinically extremely vulnerable. The association of severe COVID-19 with recent hospital exposure in those who were eligible for shielding, together with the increase in the rate ratio associated with this exposure during periods when population-wide social distancing measures were being imposed, suggests that exposure to transmission in hospital settings is at least part of the explanation.  Our finding that the risk of severe COVID-19 was increased in those who were sharing a household with other adults suggests that this was another constraint on the effectiveness of advice to shield, as no support was provided for other household members to co-isolate with the vulnerable individual. A survey conducted online in the first two weeks of June 2020 found that 65% of those living alone or sharing a a household with one other person reported that they followed the guidance completely, but only 55% of those living with with two or more others did [@delvaux_covid-19_2020].  Development of policies to overcome these constraints may lay a basis for focused protection of the most vulnerable individuals to be more effective in future epidemics.  
+
+### Association with  occupation and with household composition
+The increased risk of severe COVID-19 in patient facing  health care workers is consistent with our previous report of a threefold risk for hospitalised COVID-19 earlier in the epidemic [@shah_risk_2020].  We and others have previously reported  lower risk in teachers compared with others of the same age and sex [@mcallister_report_2020; @ludvigsson_open_2021]. The inverse association of severe disease with the number of school-age children in the household extends and confirms the findings of an earlier study of health care workers and their families [@wood_sharing_2021]. In the OPENSAFELY cohort, the rate ratio for fatal COVID-19 associated with living with children aged 0-11 years was 0.75 after adjusting for covariates, but no dose-response relationship was reported [@forbes_association_2020].  
+
+The strong association of severe disease with number of adults in the household is consistent with a recent estimate, based on an intensive study of households in the Netherlands, that the secondary attack rate for SARS-CoV-2 infection is as high as 51% in adults [@reukers_high_2021]. We would expect the risk of infection to increase with the number of other people in the household, especially where population-wide social distancing between households has been imposed.  We might also expect that this association would be strongest for severe disease, as the infecting dose is likely to be higher in intra-household transmissions than in transmissions between households. This is consistent with classic studies of other viral infections showing that secondary cases in a household are more severe than index cases [@aaby_malnutrition_1988].  The inverse association of severe COVID-19 with number of children in the household, and the lower risk in teachers however suggests that current or past exposure to children may have some protective effect on adults.   A possible explanation may be that other coronaviruses generate cross-reactive T-cell responses that may confer some resistance to SARS-CoV-2 [@braun_sars-cov-2-reactive_2020].  From a public health perspective the most relevant implication is that although the rate ratio per child in the household has been higher in the second wave of the epidemic than in the first wave, it has remained below 1 in almost all time windows.  
+
+### Association with recent exposure to hospital
+A striking finding from our analysis is the  population attributable risk fraction of `r round(100 * pc.all * (r.all - 1) / r.all)`% for severe disease associated with recent exposure to hospital.  Although we had pre-specified this category to include day case and outpatient exposure, the association was driven by inpatient exposure.  The population attributable risk fraction associated with inpatient exposure was  `r round(100 * parf.rapid)`%.  The calculation of the population attributable risk fraction for an exposure provides an upper bound on the predicted effect of removing that exposure.  As explained in the Methods section, for estimating the population attributable risk fraction it is appropriate to use an inclusive definition of exposure that includes all those whose infection could have been acquired in hospital. Using the ECDC definition of probable/definite nosocomial acquisition would give a lower estimate of the  proportion of severe cases exposed to hospitals and the population attributable risk fraction, because the ECDC definition excludes cases who were not continuously in hospital for at least 8 days before presenting.  
+
+The association of severe COVID-19 with recent hospital admission is likely to be confounded by pre-existing risk conditions. However adjusting for risk conditions in a multivariable analysis reduced the rate ratio associated with recent hospital exposure only slightly (from  `r round(as.numeric(gsub(" .+", "", table.shielded.severecases.nocare["Recent hospital visit/stay", 3])), 1)` to  `r round(as.numeric(gsub(" .+", "", table.shielded.severecases.nocare["Recent hospital visit/stay", 5])), 1)`).    The most compelling evidence of causality is the time window analysis, which shows that the association of disease is with elapsed time since exposure corresponding to the known incubation period of SARS-CoV-2.  The rate ratio estimated from the time window analysis is not directly comparable with the rate ratio based on the case-control analysis because restriction to those with discordant exposure between time windows selects those with  fewer days in hospital (lower dosage of the exposure).  
+
+The role of nosocomial transmission was recognized early in the COVID-19 epidemic. Hospital-acquired infection was suspected in 41% of hospitalised cases seen in January 2020 in one centre in Wuhan [@wang_clinical_2020-2].  A commentary in April 2020 noted that "in Lombardy, SARS-CoV-2 became largely a nosocomial infection" [@boccia_what_2020].  A study of 11 hospitals (10 in the UK) reported that 12.5% of hospitalized cases of COVID-19 up to the end of April 2020 met the ECDC criterion for definite nosocomial infection [@carter_nosocomial_2020].  Most other reports have used the ECDC criterion for probable/definite nosocomial infection   A study presented to the UK Scientific Advisory Group on Emergencies in January 2021 based on national data for hospital episodes and COVID-19 tests in England linked to symptom onset data from the COVID-19 Clinical Information Network estimated that 27.6% of hospitalized cases up to the end of July 2020 met this criterion, and that onward transmission of COVID-19 from hospital-acquired cases could account for another 5% of hospitalised cases [@knight_contribution_2021].  No systematic study of nosocomial cases has been reported for England in the second wave: from routinely reported data the proportion of hospitalized cases that met the criterion for probable/definite nosocomial was estimated to be 18% in October 2020.  For Scotland the ARHAI (Antimicrobial Resistance and Healthcare Associated Infection) unit of NHS National Services Scotland recently reported that among those who died within 28 days of testing positive for COVID-19 (including care home residents) during 2020, 30% met the  ECDC definition of probable or definite nosocomial infection [@arhai_scotland_hospital_2021].   
+
+## Strengths and limitations 
+Strengths of our study are the national coverage and the comprehensive linkage to medical records and demographic risk factors.  A limitation is that we do not have primary care data other than encashed prescriptions.  Furthermore, as most immunosuppressant drugs are prescribed through hospitals where linkage to prescribing records is not yet possible, the risks associated with specific immunosuppressant drug classes could not be investigated.  We have no data on help with daily activities from non-resident carers as another possible source of exposure of clinically vulnerable individuals attempting to shield themselves.  As we do not have individual-level data on compliance with shielding advice, we cannot directly evaluate the extent to which non-compliance or non-receipt of letters might have reduced the effectiveness of shielding advice: we can only evaluate the programme as implemented. 
+
+As all hospital inpatients are tested for SARS-CoV-2 every few days and all deaths within 28 days of a positive test are officially classified as deaths involving COVID-19,  some misclassification of deaths from other causes as COVID-19 deaths is likely in those with recent hospital exposure.  However the rate ratio associated with recent hospital exposure was barely changed when fatal cases without COVID-19 as underlying cause of death on death certificate were omitted. 
+
+## Policy implications 
+Our results have implications for policies on shielding the vulnerable, vaccination, and control of SARS-CoV-2 transmission in the population. We have identified two sources of exposure that are associated with severe disease and cannot easily be avoided by those advised to shield: in-patient hospital care, and sharing a household with other adults. Measures to allow vulnerable individuals to reduce their exposure could include extra protection from  nosocomial infection, and support for other household members to co-isolate with the vulnerable individual. 
+
+Our findings support the policy of assigning highest priority for vaccination to those with risk conditions eligible for shielding, as these groups have markedly elevated risks of severe COVID-19. For solid organ transplant recipients -- the group at highest risk -- it is uncertain whether the vaccine will evoke an immune response sufficient to be effective  [@chong_comprehensive_2017].  As there is now evidence that vaccination reduces transmission to household contacts [@public_health_scotland_covid-19_2021], one way to reduce risk in this group would be to vaccinate their household contacts.  
+
+Policies for control of transmission in the population and for reducing burden on health services and total deaths have focused on population-wide reduction of social contact. However our analysis provides compelling evidence for a substantial contribution of nosocomial transmission to the burden of severe COVID-19 even during the second wave. A report for NHS England by the Healthcare Safety Investigation Branch noted the challenges of controlling nosocomial transmission and recommended that a national strategy for infection prevention and control should be developed [@healthcare_safety_investigation_branch_investigation_2020].  Vaccination of health care workers is likely to reduce nosocomial transmission, but vaccination of those booked for elective procedures should also be considered.  We have not attempted to quantify the onward transmission of COVID-19 from discharged patients, but the PHE modelling study estimated that this could have accounted for 5% of cases requiring hospitalisation in England during the first wave [@knight_contribution_2021]. This suggests  more stringent testing before discharge and quarantine post discharge should be considered. More detailed understanding of how recommended infection control policies are being operationalised is also needed [@oliver_could_2021].
+
+# Conclusions
+The effectiveness of shielding vulnerable individuals was limited by the inability to control transmission in hospital and from other adults in the household. Mitigating the impact of the epidemic requires control of nosocomial transmission.  
+
+# List of abbreviations  
+CHI, Community Health Index  
+ECDC, European Centre for Disease Prevention and control  
+ECOSS, Electronic Communication of Surveillance in Scotland  
+NHS, National Health Service  
+NRS, National Records of Scotland  
+PHS, Public Health Scotland  
+SICSAG, Scottish Intensive Care Society and Audit Group  
+SIMD, Scottish Index of Multiple Deprivation  
+SMR, Scottish Morbidity Record  
+
+# Declarations
+## Ethics approval and information governance
+This study was approved under COVID-19 Rapid Data Protection Impact Assessment​ 20210023 that allows Public Health Scotland staff to link datasets without requiring individual consent and to make de-identified datasets available for analysis within Public Health Scotland. 
+
+## Funding 
+No specific funding was received for this study. HC is supported by an AXA Foundation fellowship. 
+
+## Data Availability
+The component datasets used here are available via the Public Benefits and Privacy Panel for Health at https://www.informationgovernance.scot.nhs.uk/pbpphsc/ for researchers who meet the criteria for access to confidential data. All source code used for derivation of variables, statistical analysis and generation of this manuscript is available on  https://github.com/pmckeigue/covid-scotland_public.
+
+## Competing interests
+The authors declare no competing interests
+
+## Author contributions
+PM, DM and HC provided substantial contributions to the conception or design and drafting of the manuscript.  NL, DC, CG, JB, MA, JD and SC provided substantial contributions to the data acquisition. SH, CR, JM and DG provided substantial contributions to the data analysis or interpretation. All authors contributed to revising the manuscript critically for important intellectual content and approved the final manuscript.--->
+
+## Acknowledgements
+We thank all staff in critical care units who submitted data to the SICSAG database, the Scottish Morbidity Record Data Team, the staff of the National Register of Scotland, the Public Health Scotland Terminology Services, the HPS COVID-19 Laboratory & Testing cell and the NHS Scotland Diagnostic Virology Laboratories.  We thank Shona Cairns and Laura Imrie of the Antimicrobial Resistance and Healthcare Associated Infection unit of NHS National Services Scotland for comments on an earlier draft of this manuscript. 
+
+## Public Health Scotland COVID-19 Health Protection Study Group
+Allan McLeod​, Alice Whettlock April Went, Beth Findlay Chris Sullivan, Ciaran Harvey, David Henderson, Edward McArdle, Eisin McDonald, Emily Griffiths, Genna Drennan, Johanna Young, Kirstin Leslie, Leonardo I Green, Louise Nicol, Melissa Llano, Nick Christofidis, Paul Bett, Ross Cameron, Theresa Ryan, Victoria Ponce Hardy.  
+Public Health Scotland, Meridian Court, 5 Cadogan Street, Glasgow G2 6QE  
+
+\nolinenumbers
+
+# References
+<div id="refs"></div>
+
+\newpage
+
+# Figure legends  
+Fig 1: Area plot of severe cases by vulnerability category and date of presentation, excluding care home residents
+
+Fig 2: (a) Recent hospital exposure by risk group and 7-day sliding window of presentation dates; (b) Rate ratio for severe COVID-19 associated with recent hospital exposure in those not resident in care homes; (c) fraction of severe cases attributable to recent hospital exposure in those not resident in care homes
+
+# Additional files  
+File name: BMED-D-21-00640_SupplementaryMaterial.pdf
+Title: Additional File
+Description: Supplementary Figure and Tables
+
+\newpage
+
+# Figures
+```{r plotcasesbydate, echo=FALSE, warning=FALSE, message=FALSE, fig.pos = "H", fig.asp=0.8, fig.cap="Area plot of severe cases by vulnerability category and date of presentation, excluding care home residents"}
+
+theme_set(theme_gray(base_size = 12))
+
+p.byelig
+```
+
+```{r plotexphosp, echo=FALSE, warning=FALSE, message=FALSE, fig.asp=1.2, fig.cap="(a) Recent hospital exposure by risk group and 7-day sliding window of presentation dates; (b) Rate ratio for severe COVID-19 associated with recent hospital exposure in those not resident in care homes; (c) fraction of severe cases attributable to recent hospital exposure in those not resident in care homes."}
+
+theme_set(theme_gray(base_size = 10))
+
+gridExtra::grid.arrange(p.hosp + theme(axis.title.x = element_blank()),
+                        p.hosp.rateratio + theme(axis.title.x = element_blank()),
+                        p.fracattr, nrow=3)
+
+```
+
+\doublespacing
+\newpage
+
+# Tables
+
+```{r shieldcasegroup, echo=FALSE, warning=FALSE, message=FALSE}
+
+colnames(table.shield.casegr)[1] <- "Not diagnosed with COVID-19"
+knitr::kable(table.shield.casegr, 
+             escape=FALSE, 
+             booktabs=TRUE,
+			 label="shieldcasegroup",
+             row.names=TRUE,
+             align=rep("r", 5),
+             caption="Frequencies of any diagnosis of COVID-19, entry to critical care and fatal outcome among those eligible for shielding, by eligibility category, up to 18 February 2021") %>%
+    add_header_above(c(" "=2, "Diagnosed with COVID-19"=3)) %>%
+    kableExtra::group_rows("Shielding eligibility category", 2, 7) %>%
+    column_spec(column=1, width="4.5cm") %>%
+    column_spec(column=2, width="2.5cm") %>%
+    column_spec(column=3, width="2.2cm") %>%
+    column_spec(column=4, width="2.2cm") %>%
+    column_spec(column=5, width="2.2cm") %>%
+    column_spec(column=6, width="2cm") %>%
+        add_footnote(label=c("Percentages are row percentages", 
+                             "Severe cases are those that entered critical care or were fatal"),
+                     notation="none") %>%
+        kable_styling(latex_options=c("scale_down", "hold_position")) 
+
+```
+	
+\onehalfspacing
+	
+```{r regressionseverecasesnocare, echo=FALSE, warning=FALSE, message=FALSE}
+
+knitr::kable(table.shielded.severecases.nocare,
+             escape=FALSE,
+             booktabs=TRUE,
+             label="regressionseverecasesnocare",
+             caption="Rate ratios for severe COVID-19 in those not resident in care homes. ", 
+             col.names=c(clean.header(colnames(table.shielded.severecases.nocare)[1:2]),
+                         "Rate ratio (95\\% CI)", "\\ensuremath{p}-value",
+                         "Rate ratio (95\\% CI)", "\\ensuremath{p}-value")) %>%
+    add_header_above(c(" "=3, "Univariate"=2, "Multivariable"=2)) %>%
+    column_spec(column=1, width="3cm") %>%
+    column_spec(column=2, width="2cm") %>%
+    column_spec(column=3, width="2cm") %>%
+    column_spec(column=4, width="2.5cm") %>%
+    column_spec(column=5, width="2cm") %>%
+    column_spec(column=6, width="2.5cm") %>%
+    column_spec(column=7, width="2cm") %>%
+    kableExtra::group_rows("Shielding eligibility category", 3, 8, bold=FALSE) %>%
+    kableExtra::group_rows("Number of school age children in household", 10, 12, bold=FALSE) %>%
+    kableExtra::group_rows("Number of adults in household", 13, 17, bold=FALSE) %>%
+    kableExtra::group_rows("SIMD quintile", 18, 22, bold=FALSE) %>%
+    kableExtra::group_rows("Occupation", 23, 26, bold=FALSE) %>%
+    kable_styling(latex_options=c("scale_down", "HOLD_position")) %>%
+    add_footnote(label=c("Severe COVID-19 is defined by entry to critical care or fatal outcome", 
+                         "Percentages are column percentages for each variable",
+                         "PF, patient-facing",
+                         "Rate ratios are from conditional logistic regression models with cases and controls matched for age, sex and general care practice",
+                         "Univariate rate ratios are for models with a single covariate",
+                         "Multivariable rate ratios are for a model including all covariates shown in the table"),
+                 notation="none")
+
+```
+
+\doublespacing
+\newpage 
+
+
+```{r shieldedonlyregressionseverecasesnocare, echo=FALSE, warning=FALSE, message=FALSE}
+
+knitr::kable(table.shieldedonly.severecases.nocare,
+             escape=FALSE,
+             booktabs=TRUE,
+             label="shieldedonlyregressionseverecasesnocare",
+             caption="Rate ratios for severe COVID-19 associated with risk conditions (with severe respiratory disease as reference category) in those eligible for shielding and not resident in care homes", 
+             col.names=c(clean.header(colnames(table.shieldedonly.severecases.nocare)[1:2]),
+                         "Rate ratio (95\\% CI)", "\\ensuremath{p}-value",
+                         "Rate ratio (95\\% CI)", "\\ensuremath{p}-value")) %>%
+    add_header_above(c(" "=3, "Univariate"=2, "Multivariable"=2)) %>%
+    column_spec(column=1, width="3.2cm") %>%
+    column_spec(column=2, width="2cm") %>%
+    column_spec(column=3, width="2cm") %>%
+    column_spec(column=4, width="2.5cm") %>%
+    column_spec(column=5, width="1.7cm") %>%
+    column_spec(column=6, width="2.7cm") %>%
+    column_spec(column=7, width="1.7cm") %>%
+    kableExtra::group_rows("Shielding eligibility category", 1, 6, bold=FALSE) %>%
+    kableExtra::group_rows("School-age children in household", 8, 10, bold=FALSE) %>%
+    kableExtra::group_rows("Adults in household", 11, 13, bold=FALSE) %>%
+    add_footnote(label=c("Severe COVID-19 is defined by entry to critical care or fatal outcome", 
+                         "Percentages are column percentages for each variable",
+                         "Rate ratios are from conditional logistic regression models matched for age, sex and general practice",
+                         "Univariate rate ratios are for models with a single covariate",
+                         "Multivariable rate ratios are for a model including all covariates shown in the table"),
+                 notation="none") %>%
+    kable_styling(latex_options=c("scale_down", "HOLD_position"))
+
+```
+
+```{r timewindow, echo=FALSE, warning=FALSE, message=FALSE}
+
+knitr::kable(table.tw[1:3, ],
+             escape=FALSE,
+             booktabs=TRUE,
+             label="timewindow",
+             row.names=FALSE,
+             caption="Rate ratios for severe COVID-19 by time window of hospital in-patient exposure, excluding care home residents", 
+             col.names=c("Time window of exposure", "Controls", "Cases",
+                         "Rate ratio (95\\% CI)", "\\ensuremath{p}-value")) %>%
+    column_spec(column=1, width="5cm") %>%
+    column_spec(column=2, width="2cm") %>%
+    column_spec(column=3, width="2cm") %>%
+    column_spec(column=4, width="3cm") %>%
+    column_spec(column=5, width="2cm") %>%
+    add_footnote(label=c("Rate ratios are from conditional logistic regression models",
+                         "Dataset restricted to those exposed at some time between 5 and 24 days before ",
+                         "first testing positive.",
+                         "Recent interval = days 5 to 14 before first testing positive, less recent interval = days 15 to 24 before first testing positive.",
+                         "Reference category is exposure in less recent interval only."), 
+                 notation="none") %>%
+    kable_styling(latex_options=c("scale_down", "HOLD_position"))
+
+```
+
+\beginsupplement
+\newpage
+\onehalfspacing
+
+# Supplementary Material
+## Supplementary Figures
+
+```{r plotrateratio, echo=FALSE, warning=FALSE, message=FALSE, fig.asp=1.2, fig.cap="(a) Rate ratios for severe COVID-19 excluding care home residents, by risk group and sliding window of presentation dates.  (b) Rate ratio for severe COVID-19 per adult and per child in household, excluding care home residents, in model with number of adults, number of children and SIMD deprivation score as covariates. Line thickness is proportional to precision of estimate. Labels on the y axes are untransformed rate ratios, though the axis scales are log-transformed"}
+
+gridExtra::grid.arrange(p.rateratio + theme(axis.title.x = element_blank()),
+                        p.household.rateratio, nrow=2)
+
+```
+
+\newpage 
+
+## Supplementary Tables
+
+```{r shieldgroupsbyage, echo=FALSE, warning=FALSE, message=FALSE}
+knitr::kable(table.shieldgroups.byage, 
+             escape=FALSE, 
+             booktabs=TRUE,
+			 label="shieldgroupsbyage",
+             row.names=TRUE,
+             align=rep("r", 5),
+             caption="Shielding eligibility cohort by eligibility category and age") %>%
+    kableExtra::group_rows("Shielding eligibility category", 1, 6) %>%
+        add_header_above(c(" "=1, "Age group"=4)) %>%
+        add_footnote(label="Percentages are row percentages",
+                     notation="none") %>%
+       kable_styling(latex_options="HOLD_position")
+
+```
+
+```{r hcai_hosp, echo=FALSE, warning=FALSE, message=FALSE}
+if(FALSE) {
+knitr::kable(table.hcai.hosp.recent,
+             escape=FALSE, 
+             booktabs=TRUE,
+             col.names=c("No recent hospital exposure", "Recent hospital exposure"), 
+			 label="hcai_hosp",
+             row.names=TRUE,
+             align=rep("r", 2), 
+             caption="Hospital onset status as defined by ECDC, by any recent hospital exposure including day cases, outpatient attendance and psychiatric admissions") %>%
+     add_footnote(label="Percentages are column percentages",
+                 notation="none") %>%
+    kable_styling(latex_options=c("hold_position"))
+}
+```
+
+```{r hcai_rapid, echo=FALSE, warning=FALSE, message=FALSE}
+
+knitr::kable(table.hcai.rapid.recent,
+             escape=FALSE, 
+             booktabs=TRUE,
+			 label="hcai_rapid",
+             row.names=TRUE,
+             align=rep("r", 2), 
+             caption="Severe test-positive cases classified by hospital onset status (as defined by ECDC) and recent inpatient exposure") %>%
+	 column_spec(column=1, width="4cm") %>%
+	 column_spec(column=2, width="2.5cm") %>%
+	 column_spec(column=3, width="2.5cm") %>%
+    add_footnote(label=c("Percentages are column percentages",
+                         "ECDC, European Centre for Disease Prevention and Control"),
+                 notation="none") %>%
+    kable_styling(latex_options=c("HOLD_position"))
+
+```
+
+```{r letterdates, echo=FALSE, warning=FALSE, message=FALSE}
+
+knitr::kable(table.date.letter,
+             escape=FALSE, 
+             booktabs=TRUE,
+			 label="letterdates",
+             row.names=TRUE,
+             align=rep("r", 6), 
+             caption="Dates of sending advice letters to those eligible for shielding") %>%
+    column_spec(column=1, width="3cm") %>%
+    column_spec(column=2, width="2.1cm") %>%
+    column_spec(column=3, width="1.9cm") %>%
+    column_spec(column=4, width="1.9cm") %>%
+    column_spec(column=5, width="1.9cm") %>%
+    column_spec(column=6, width="1.9cm") %>%
+    add_footnote(label="Percentages are row percentages",
+                 notation="none") %>%
+    kable_styling(latex_options=c("scale_down", "hold_position"))
+
+```

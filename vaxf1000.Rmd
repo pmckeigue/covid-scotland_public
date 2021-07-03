@@ -1,0 +1,603 @@
+---
+title: "Efficacy of COVID-19 vaccination in individuals designated as clinically extremely vulnerable in Scotland"
+author:
+  - name: Paul M McKeigue\textsuperscript{\getAff{Usher}}
+    affiliation: HPS
+  - name: David A McAllister\textsuperscript{\getAff{Glasgow}}  
+    affiliation: HPS 
+  - name: Jen Bishop
+    affiliation: HPS
+  - name: Sharon Hutchinson\textsuperscript{\getAff{GCU}} 
+    affiliation: HPS
+  - name: Chris Robertson\textsuperscript{\getAff{Strathclyde}}   
+    affiliation: HPS
+  - name: Nazir Lone
+    affiliation: Usher
+  - name: Jim McMenamin 
+    affiliation: HPS
+  - name: David Goldberg
+    affiliation: HPS
+  - name: Helen M Colhoun\textsuperscript{\getAff{IGMM}}
+    corresponding: yes
+    email: helen.colhoun@igmm.ed.ac.uk
+    affiliation: HPS
+address: 
+- code: Usher
+  address: Usher Institute, College of Medicine and Veterinary Medicine, University of Edinburgh, Teviot Place, Edinburgh EH8 9AG, Scotland. PM - Professor of Genetic Epidemiology and Statistical Genetics. NL - Clinical Senior Lecturer in Critical Care  
+- code: HPS
+  address: Public Health Scotland, Meridian Court, 5 Cadogan Street, Glasgow G2 6QE
+- code: Glasgow
+  address: Institute of Health and Wellbeing, University of Glasgow, 1 Lilybank Gardens, Glasgow G12 8RZ. DM - Senior Clinical Lecturer in Public Health 
+- code: GCU
+  address: School of Health and Life Sciences, Glasgow Caledonian University. SH - Professor of Epidemiology and Population Health 
+- code: Strathclyde
+  address: Department of Mathematics and Statistics, University of Strathclyde, 16 Richmond Street, Glasgow G1 1XQ. CR - Professor of Public Health Epidemiology
+- code: IGMM
+  address: Institute of Genetics and Cancer, College of Medicine and Veterinary Medicine, University of Edinburgh, Western General Hospital Campus, Crewe Road, Edinburgh EH4 2XUC, Scotland. HC - AXA Chair in Medical Informatics and Epidemiology
+
+header-includes:
+  \usepackage{newunicodechar}
+  \usepackage[T1]{fontenc}
+  \let\origquote\quote
+  \def\quote{\origquote\itshape}
+  \usepackage{graphicx}
+  \usepackage{geometry}
+  \usepackage{longtable}
+  \usepackage{booktabs}
+  \usepackage{float}
+  \floatplacement{figure}{H}
+  \usepackage{array}
+  \usepackage{threeparttable}
+  \usepackage{longtable}
+output: 
+  rticles::nejm_article:
+    includes:
+      in_header: ./preamble.tex
+    latex_engine: lualatex
+    keep_tex: true
+    fig_caption: yes
+    md_extensions: -autolink_bare_uris
+geometry: "left=2cm,right=2cm,top=2cm,bottom=2cm"
+bibliography: ./covid.bib
+csl: ./f1000.csl # ./plos.csl
+always_allow_html: true
+urlcolor: blue
+linenumbers: false
+linkcolor: cyan
+---
+
+```{r vax, echo=FALSE, warning=FALSE, message=FALSE}
+library(data.table)
+library(ggplot2)
+source("helperfunctions.R")
+
+rollmean.dtN <- function(dt, k) {
+    ## FIXME: add a by= argument
+    N.dates <- dt[, .N, by=SPECIMENDATE]
+    setkey(N.dates, SPECIMENDATE)
+    all.dates <- data.table(date=seq(from=min(N.dates$SPECIMENDATE),
+                                     to=max(N.dates$SPECIMENDATE),
+                                     by=1))
+    setkey(all.dates, date)
+
+    ## add rows for missing dates by a left join
+    all.dates <- N.dates[all.dates]
+    all.dates[is.na(N), N := 0]
+    return(data.table(date=dt$SPECIMENDATE,
+                      avdaily=zoo::rollmean(dt$N, k=k, fill=NA)))
+}
+
+rollsum.datewin <- function(dt, k, datevar) {
+    ## returns a table of rolling sums of width k centred on date
+    ## dt is a dataset of totals (N) by date, which may have no rows for some dates in the
+    ## range of interest
+    ## add rows for missing dates by a left join of all.dates with dt
+    all.dates <- data.table(date=seq(from=min(dt[[datevar]]),
+                                     to=max(dt[[datevar]]),
+                                     by=1))
+    setkey(all.dates, date)
+    # setkeyv(dt, datevar) can't set physical key here
+    all.dates <- dt[all.dates]
+
+    return(data.table(date=all.dates[[datevar]],
+                      rsum=zoo::rollsum(all.dates[, N], k=k, fill=0, align="center")))
+}
+
+format.estcipv <- function(x.ci, x.pval) {
+    x <- gsub(" \\(", " \\(95\\% CI ", as.character(x.ci))
+    x <- gsub(", ", " to ", x)
+    x <- gsub("\\)", paste0(", _p_=\\", x.pval, "\\)"), x)
+    x <- gsub("times", "\\\\times", x)
+    return(x)
+}
+
+format.estci <- function(x.ci) {
+    x <- gsub(" \\(", " \\(95\\% CI ", as.character(x.ci))
+    x <- gsub(", ", " to ", x)
+    #x <- gsub("\\)", paste0(", _p_=\\", x.pval, "\\)"), x)
+    #x <- gsub("times", "\\\\times", x)
+    return(x)
+}
+
+options(knitr.kable.NA = '.')
+options(knitr.table.format = "latex") # adds tab: prefix to labels
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+
+## vaccination analysis
+
+datadir <- "data/2021-03-16/"
+load(file=paste0(datadir, "cc.all.RData"))
+
+
+winsize.casedates <- 3
+## use by= to get rolling means by category
+
+firstdate <- as.Date("2020-12-15")
+lastdate <- as.Date("2021-03-01")
+                     
+casedates.byriskgroup <- cc.severe[CASE==1, .N, by=.(SPECIMENDATE, listedgr3)]
+setkey(casedates.byriskgroup, SPECIMENDATE)
+casedates.byriskgroup <- casedates.byriskgroup[, rollmean.dtN(dt=.SD, k=winsize.casedates),
+                                         by=listedgr3,
+                                         .SDcols=c("SPECIMENDATE", "N")]
+                                 
+p.byriskgroup <- ggplot(data=casedates.byriskgroup[date <= lastdate],
+                     aes(x=date,
+                         y=avdaily, fill=listedgr3)) +
+    geom_area() +
+    scale_x_date(expand=c(0, 3), breaks = seq.Date(from = as.Date("2021-01-01"),
+                                   to = as.Date("2021-03-01"),
+                                   by = "month"),
+                 labels=gsub("^0", "", 
+                             format.Date(seq.Date(from = as.Date("2021-01-01"),
+                                                  to = as.Date("2021-03-01"), by = "month"),
+                                         "%d %b")
+                 ),
+                 limits=c(firstdate, lastdate)) +
+    theme(legend.position = c(0.8, 0.8)) +
+    theme(legend.title = element_blank()) +
+    scale_fill_manual(values=c("grey", "blue", "red")) +
+    ggtitle("(a) Daily severe cases in Scotland") + 
+    xlab(paste0("Specimen date: mid-point of ", winsize.casedates, "-day window")) +
+         ylab("Daily severe cases")
+
+
+table.vaxshield <- with(cc.all[CASE==0], table(vax14.dose, shield.any))
+table.vaxshield <- rbind(paste.colpercent(table.vaxshield, digits=2),
+                         colSums(table.vaxshield))
+                         
+shield.bydate <- cc.all[CASE==0 & SPECIMENDATE >= as.Date("2020-12-01") & shield.any==TRUE,
+                           .N, by=c("SPECIMENDATE")]
+setkey(shield.bydate, SPECIMENDATE)
+shield.bydate <- rollsum.datewin(shield.bydate, 7, "SPECIMENDATE")
+setnames(shield.bydate, "rsum", "all")
+setkey(shield.bydate, date)
+
+shieldvax.bydate <- cc.all[CASE==0 & SPECIMENDATE >= as.Date("2020-12-01") &
+                           shield.any==TRUE & vax14==1,
+                           .N,
+                           by=c("SPECIMENDATE")] # 6193 vaccinated
+setkey(shieldvax.bydate, SPECIMENDATE)
+shieldvax.bydate <- rollsum.datewin(shieldvax.bydate, 7, "SPECIMENDATE")
+setnames(shieldvax.bydate, "rsum", "vax")
+setkey(shieldvax.bydate, date)       
+shield1.bydate <- shieldvax.bydate[shield.bydate]
+shield1.bydate[, prop.vax := vax / all]
+
+p.shieldvax <-
+    ggplot(data=shield1.bydate, aes(x=date, y=prop.vax)) +
+    geom_line() +
+    scale_y_continuous(breaks=c(0, 0.5, 1), limits=c(0, 1),
+                       expand=c(0, 0)) + 
+    scale_x_date(expand=c(0, 3), breaks = seq.Date(from = as.Date("2021-01-01"),
+                                   to = as.Date("2021-03-01"),
+                                   by = "month"),
+                 labels=gsub("^0", "", 
+                             format.Date(seq.Date(from = as.Date("2021-01-01"),
+                                                  to =  as.Date("2021-03-01"),
+                                                  by = "month"),
+                                         "%d %b")
+                             ),
+                 limits=c(firstdate, lastdate)) +
+    ggtitle("(b) Controls eligible for shielding: proportion vaccinated") + 
+        labs(x=paste0("Sampling date: mid-point of 7-day window"),
+         y=stringr::str_wrap("Proportion vaccinated", width=35))
+
+keep.vars <- c("SPECIMENDATE", "CASE", "discharge15to56", "prob.hcai", "care.home", "hh.over18", "listedgr3", "shield.any", "shield.group", "shieldelig.group", "dm.type3", "fatalcase",
+               listed.conditions, "shield.group", "vax14", "vax14.dose", "stratum")
+cc.vax <- na.omit(cc.severe[SPECIMENDATE > as.Date("2020-12-01"), ..keep.vars])
+cc.vax[, listedgr5 := listedgr3]
+cc.vax[listedgr3=="Moderate risk condition" & dm.type != "Not diabetic",
+       listedgr5 := dm.type3]
+cc.vax[, listedgr5 := factor(as.character(listedgr5),
+                     levels=c("No risk condition",
+                              "Type 1 diabetes", "Type 2 diabetes",
+                              "Moderate risk condition",
+                              "Eligible for shielding"))] 
+
+table.dmriskgroups <- summary(clogit(data=cc.vax[care.home=="Independent"],
+         formula = CASE ~  listedgr5 / vax14 + strata(stratum)))$coefficients # matrix
+effect <- rownames(table.dmriskgroups)
+table.dmriskgroups <- data.table(effect=effect, table.dmriskgroups)
+
+
+table.dmriskgroups[, rateratio := or.ci(coef, `se(coef)`)]
+table.dmriskgroups[, pvalue := format.pvalue(z, `Pr(>|z|)`)]
+table.dmriskgroups <- table.dmriskgroups[5:9, .(effect, rateratio, pvalue)]
+table.dmriskgroups[, effect := gsub("listedgr5|vax14TRUE", "", effect)]
+
+freqs.riskgroups <- as.data.frame.matrix(cbind(
+    univariate.tabulate(varnames=c("listedgr5"), data=cc.vax,
+                        drop.reflevel=FALSE),
+    univariate.tabulate(varnames=c("listedgr5"), data=cc.vax[vax14==1],
+                        drop.reflevel=FALSE)))[-1, ]
+
+keep.hosp.vars <- c("SPECIMENDATE", "CASE", "discharge15to56", "care.home", "shield.any", "shieldelig.group", 
+                    "vax14", "stratum")
+cc.hosp.vax <- na.omit(cc.all[(casegroup=="A" | casegroup=="B") &
+                              SPECIMENDATE > as.Date("2020-12-01"), ..keep.hosp.vars])
+#rm(cc.all)
+
+mh.strata <- cc.vax[care.home=="Independent" & shield.any==TRUE, 
+                    .(SPECIMENDATE, stratum, CASE, vax14)]
+mh.strata <- mh.strata[, c("a", "b", "c", "d") :=
+                           list(CASE * as.integer(vax14),
+                                (1 - CASE) * as.integer(vax14),
+                                CASE * (1 - as.integer(vax14)),
+                                (1 - CASE) * (1 - as.integer(vax14)))]
+mh.strata <- mh.strata[, lapply(.SD, sum),
+                       by=c("SPECIMENDATE", "stratum"), 
+                       .SDcols=c("a", "b", "c", "d")]
+mh.strata[, N := a + b + c + d]
+mh.strata[, a.exp := (a + b) * (a + c) / N]
+mh.strata[, c.exp := (a + c) * (c + d) / N]
+mh.strata[, var.exp := (a + c) * (b + d) * (a + b) * (c + d) / (N^2 * (N - 1))]
+mh.strata[is.nan(var.exp), var.exp := 0]
+mh.strata[, week := paste(lubridate::year(SPECIMENDATE),
+                          sprintf("%02d", lubridate::week(SPECIMENDATE)), sep=":")]
+
+mh.dates <- mh.strata[, lapply(.SD, sum), by=week,
+                      .SDcols=c("a", "a.exp", "c", "c.exp", "var.exp")]
+setkey(mh.dates, week) 
+mh.all <- data.table(week="All", mh.dates[, lapply(.SD, sum),
+                                          .SDcols=c("a", "a.exp", "c", "c.exp", "var.exp")])
+mh.dates <- rbind(mh.dates, mh.all)
+colnames(mh.dates) <- c("Year:week", "Observed", "Expected", "Observed", "Expected", "Var(expected)")
+
+table.dose <- summary(clogit(data=cc.vax, formula = CASE ~ care.home + listedgr3 / vax14.dose + strata(stratum)))$coefficients
+
+
+table.riskgroups <- summary(clogit(data=cc.vax, formula = CASE ~ care.home + listedgr3 / vax14 + strata(stratum)))$coefficients
+
+effect <- rownames(table.riskgroups)
+table.riskgroups <- as.data.table(table.riskgroups)
+table.riskgroups[, rateratio := or.ci(coef, `se(coef)`)]
+table.riskgroups[, pvalue := format.pvalue(z, `Pr(>|z|)`)]
+table.riskgroups <- table.riskgroups[, .(rateratio, pvalue)]
+table.riskgroups <- data.table(effect=effect, # freqs.riskgroups,
+                               table.riskgroups)
+table.riskgroups[, effect := gsub("care.homeCare/nursing home", "Care home residence", effect)]
+table.riskgroups[, effect := gsub("^listedgr3", "", effect)]
+table.riskgroups[, effect := gsub("TRUE$", "", effect)]
+table.riskgroups[, effect := gsub(":vax14$", "", effect)]
+table.riskgroups[, effect := replace.names(effect)]
+
+table.riskgroups2 <- summary(clogit(data=cc.vax, formula = CASE ~ care.home + shield.any / vax14 + strata(stratum)))$coefficients
+
+effect <- rownames(table.riskgroups2)
+table.riskgroups2 <- as.data.table(table.riskgroups2)
+table.riskgroups2[, rateratio := or.ci(coef, `se(coef)`)]
+table.riskgroups2[, pvalue := format.pvalue(z, `Pr(>|z|)`)]
+table.riskgroups2 <- table.riskgroups2[, .(rateratio, pvalue)]
+table.riskgroups2 <- data.table(effect=effect, # freqs.riskgroups2,
+                               table.riskgroups2)
+table.riskgroups2[, effect := gsub("care.homeCare/nursing home", "Care home residence", effect)]
+table.riskgroups2[, effect := gsub("^listedgr3", "", effect)]
+table.riskgroups2[, effect := gsub("TRUE$", "", effect)]
+table.riskgroups2[, effect := gsub(":vax14$", "", effect)]
+table.riskgroups2[, effect := replace.names(effect)]
+
+table.adjhosp <- summary(clogit(data=cc.vax, 
+                               formula = CASE ~ care.home + shield.any / vax14 +
+                                   prob.hcai + discharge15to56 + strata(stratum)))$coefficients
+
+table.adjhosp <- as.data.table(table.adjhosp)
+table.adjhosp[, rateratio := or.ci(coef, `se(coef)`)]
+table.adjhosp[, pvalue := format.pvalue(z, `Pr(>|z|)`)]
+table.adjhosp <- table.adjhosp[, .(rateratio, pvalue)]
+
+table.shieldgroups <- summary(clogit(data=cc.vax, formula = CASE ~ care.home + shieldelig.group / vax14 + strata(stratum)))$coefficients
+effect <- rownames(table.shieldgroups)
+table.shieldgroups <- as.data.table(table.shieldgroups)
+table.shieldgroups[, rateratio := or.ci(coef, `se(coef)`)]
+table.shieldgroups[, pvalue := format.pvalue(z, `Pr(>|z|)`)]
+table.shieldgroups <- table.shieldgroups[, .(rateratio, pvalue)]
+table.shieldgroups <- data.table(effect=effect, # freqs.shieldgroups,
+                               table.shieldgroups)
+table.shieldgroups[, effect := gsub("care.homeCare/nursing home", "Care home residence", effect)]
+table.shieldgroups[, effect := gsub("^shieldelig.group", "", effect)]
+table.shieldgroups[, effect := gsub("TRUE$", "", effect)]
+table.shieldgroups[, effect := gsub(":vax14$", "", effect)]
+table.shieldgroups[, effect := replace.names(effect)]
+table.shieldgroups <- as.data.frame(table.shieldgroups) 
+
+table.riskgroups2.hosp <- summary(clogit(data=cc.hosp.vax, formula = CASE ~ care.home + shield.any / vax14 + strata(stratum)))$coefficients
+
+effect <- rownames(table.riskgroups2.hosp)
+table.riskgroups2.hosp <- as.data.table(table.riskgroups2.hosp)
+table.riskgroups2.hosp[, rateratio := or.ci(coef, `se(coef)`)]
+table.riskgroups2.hosp[, pvalue := format.pvalue(z, `Pr(>|z|)`)]
+table.riskgroups2.hosp <- table.riskgroups2.hosp[, .(rateratio, pvalue)]
+table.riskgroups2.hosp <- data.table(effect=effect, # freqs.riskgroups2.hosp,
+                               table.riskgroups2.hosp)
+table.riskgroups2.hosp[, effect := gsub("care.homeCare/nursing home", "Care home residence", effect)]
+table.riskgroups2.hosp[, effect := gsub("^listedgr3", "", effect)]
+table.riskgroups2.hosp[, effect := gsub("TRUE$", "", effect)]
+table.riskgroups2.hosp[, effect := gsub(":vax14$", "", effect)]
+table.riskgroups2.hosp[, effect := replace.names(effect)]
+
+
+table.hosp <- summary(clogit(data=cc.hosp.vax, formula = CASE ~ care.home + shieldelig.group / vax14 + strata(stratum)))$coefficients
+effect <- rownames(table.hosp)
+table.hosp <- as.data.table(table.hosp)
+table.hosp[, rateratio := or.ci(coef, `se(coef)`)]
+table.hosp[, pvalue := format.pvalue(z, `Pr(>|z|)`)]
+table.hosp <- table.hosp[, .(rateratio, pvalue)]
+table.hosp <- data.table(effect=effect, # freqs.hosp,
+                               table.hosp)
+table.hosp[, effect := gsub("care.homeCare/nursing home", "Care home residence", effect)]
+table.hosp[, effect := gsub("^shieldelig.group", "", effect)]
+table.hosp[, effect := gsub("TRUE$", "", effect)]
+table.hosp[, effect := gsub(":vax14$", "", effect)]
+table.hosp[, effect := replace.names(effect)]
+table.hosp <- as.data.frame(table.hosp) 
+
+freqs.riskgroups <- as.data.frame.matrix(cbind(
+    univariate.tabulate(varnames=c("care.home", "listedgr3"), data=cc.vax,
+                        drop.reflevel=FALSE),
+    univariate.tabulate(varnames=c("care.home", "listedgr3"), data=cc.vax[vax14==1],
+                        drop.reflevel=FALSE)))[-1, ]
+
+
+oddsratio.table <- function(freqs.table) {
+    freqs.table <- as.matrix(freqs.table)
+    or <- numeric(nrow(freqs.table))
+    for(i in 1:nrow(freqs.table)) {
+        a <- as.numeric(gsub(" .+", "", freqs.table[i, ]))
+        or[i] <- a[1] * a[4] / (a[2] * a[3])
+    }
+    return(round(or, 2))
+}
+
+freqs.shieldgroups <- as.data.frame.matrix(cbind(
+   with(cc.vax[CASE==0], paste.rowpercent(table(shieldelig.group, vax14))),
+   with(cc.vax[CASE==1], paste.rowpercent(table(shieldelig.group, vax14)))
+   ))
+
+freqs.hosp <- as.data.frame.matrix(cbind(
+   with(cc.hosp.vax[CASE==0], paste.rowpercent(table(shieldelig.group, vax14))),
+   with(cc.hosp.vax[CASE==1], paste.rowpercent(table(shieldelig.group, vax14)))
+   ))
+
+rownames(freqs.hosp) <- table.hosp$effect[8:14]
+
+
+if(FALSE) {
+cc.vax[`dm.typeOther/unknown type` == 1, `dm.typeType 2 diabetes` := 1]
+cc.vax[, `dm.typeOther/unknown type` := NULL]
+
+controls.vax <- cc.kept[CASE==0 & care.home=="Independent", .(AGE, COVID.age, vax_dose_1)]
+controls.vax[, vaxnow := !is.na(vax_dose_1)]
+controls.vax[, vaxnow := car::recode(vaxnow,
+                                   recodes="FALSE='Not vaccinated';
+                                            TRUE='At least one dose'",
+                                   as.factor=TRUE,
+                                   levels=c("Not vaccinated", "At least one dose"))]
+
+theme_set(theme_gray(base_size = 16))
+p.covidage <- ggplot(data=controls.vax, aes(x=AGE, y=COVID.age, color=vaxnow)) +
+    geom_point(size=0.5, position="jitter") +
+    scale_x_continuous(breaks=seq(20, 80, by=10), limits=c(15, 90)) + 
+    scale_y_continuous(breaks=seq(20, 80, by=10), limits=c(15, 90)) +
+    theme(legend.title = element_blank()) +
+    theme(legend.position=c(0.15, 0.85)) +
+    guides(color = guide_legend(override.aes = list(size = 3))) +
+    labs(title=paste("COVID age versus calendar age by vaccination status on",
+                        format.Date(max(vacc$vax_dose_1), '%d %b %Y')),
+         caption="Controls matched to severe cases, not resident in care homes. Limits of COVID age are 16 and 90 years",
+         x="Calendar age (years)",
+         y="COVID age (years)")
+p.covidage
+
+png("COVIDage_vaxstatus.png")
+p.covidage
+dev.off()
+rm(p.covidage)
+
+vax.firstdoses <- vacc[, .N, by=c("weekdose1", "vax_type_1")]
+ggplot(data=vax.firstdoses, aes(x=weekdose1, y=N, color=vax_type_1)) +
+    geom_line() 
+
+}
+
+```
+2310 words, abstract 304 words 
+
+\newpage
+
+# Abstract
+_Background_ - Although COVID-19 vaccines have been shown to have high efficacy in the general population, it has not been established whether this applies to vulnerable groups. The objective of this study was to estimate the efficacy of vaccination in reducing the risk of severe COVID-19 among those designated as clinically extremely vulnerable.    
+
+_Methods_ -  In a matched case-control design (REACT-SCOT), all `r nrow(cc.all[CASE==1 & SPECIMENDATE >= as.Date("2020-12-01")])` incident cases of COVID-19 in Scotland diagnosed from 1 December 2020 to 16 March 2021 were matched for age, sex and primary care practice to `r nrow(cc.all[CASE==0 & SPECIMENDATE >= as.Date("2020-12-01")])` controls from the general population. This was linked to national data on vaccinations and those designated as clinically extremely vulnerable and thus eligible for shielding support.  Severe COVID-19 was defined as cases with entry to critical care or fatal outcome.  Rate ratios associated with vaccination within risk groups were estimated by conditional logistic regression.  
+
+_Results_ -  The rate ratio for severe COVID-19 associated with vaccination at least 14 days before was `r format.estci(table.riskgroups2$rateratio[4])` in those eligible for shielding, compared with `r format.estci(table.riskgroups2$rateratio[3])` in those ineligible for shielding.  The rate ratio for hospitalised or fatal COVID-19 was `r format.estci(table.riskgroups2.hosp$rateratio[4])` in those  eligible and  `r format.estci(table.riskgroups2.hosp$rateratio[3])` in those not eligible for shielding.  Examined by specific shielding conditions, the rate ratio for hospitalized or fatal COVID-19  ranged from `r format.estci(table.hosp[10, 2])` in those with specific cancers to `r format.estci(table.hosp[9, 2])` in solid organ transplants recipients, and  `r format.estci(table.hosp[13, 2])` in others on immunosuppressants (excluding solid organ transplant recipients). 
+
+_Conclusions_ -  These results are reassuring with respect to efficacy of vaccination in clinically vulnerable individuals including immunocompromised individuals, but studies in larger populations are needed to estimate efficacy in solid organ transplant recipients.  
+
+# Introduction
+ A primary-care based observational study that included cases diagnosed up to 15 Feb 2021 in Scotland estimated maximal efficacy of a single vaccine dose to be 70% for ChAdOx1 nCoV-19 and 85% for BNT162b2 mRNA at 28 days post-vaccination [@vasileiou_interim_2021].  However policy on managing the epidemic depends critically upon the extent to which vaccination protects clinically vulnerable individuals, who account for most hospitalizations and deaths [@mckeigue_rapid_2020], against severe COVID-19.  Whet levels of vaccine efficacy pertain among those designated as clinically extremely vulnerable to COVID-19  is unclear.   In Scotland early in the epidemic Public Health Scotland established a register of all those with certain conditions or on certain drugs that were likely to lead to  extreme vulnerability to COVID-19 was established based on electronic health care records and primary care physician reporting  [@health_protection_scotland_search_2020;@kanani_caring_2020].  This register was used to determine eligibility for the national shielding support programme. We previously reported on the risk of severe COVID-19 in this shielding eligibility cohort compared to the rest of the population [@mckeigue_relation_2021-1]. If vaccine efficacy were estimated to be lower in clinically extremely vulnerable individuals than in the rest of the population, additional measures to shield these individuals would be needed until overall  transmission rates in the population are low.  Lower vaccine efficacy is possible since many such persons are immunocompromised or on immunosuppressants.  Therefore, the aim of this study was to examine the efficacy of  COVID-19 vaccination in reducing the risk of severe COVID-19 among those designated as clinically extremely vulnerable in Scotland. 
+ 
+Keywords: COVID-19, record linkage, case-control studies, vaccination, efficacy, solid organ transplant, immunosuppression, severe respiratory disease, cancer
+
+
+# Methods 
+This analysis is based on the REACT-SCOT matched case-control study, established at the beginning of the epidemic to investigate risk factors for severe COVID-19 in the population of Scotland [@mckeigue_rapid_2020].  We used this study to take advantage of data linkages already established. The design has been described in detail previously [@mckeigue_rapid_2020]. In brief, for every incident case of COVID-19 in the population ten controls matched for one-year age, sex and primary care practice and alive on the day of presentation of the case that they were matched to were selected using the Community Health Index database.  COVID-19 cases are those with a positive nucleic acid test, or a hospital admission or death with COVID-19 ICD-10 codes. The REACT-SCOT case-control dataset is refreshed regularly and is linked to the vaccination database and to the regularly updated dataset of all individuals deemed eligible for the shielding programme.  
+
+As previously [@mckeigue_rapid_2020], to minimise ascertainment bias we pre-specified the primary outcome measure as severe COVID-19,  defined as cases with entry to critical care within 28 days of presentation or fatal outcome (any death within 28 days of a positive test or any death for which COVID-19 was coded as underlying cause).  As previously, cases and controls were classified as eligible or ineligible for shielding [@mckeigue_relation_2021-1].   For further analyses, the shielding category was subdivided as described previously  into six categories: solid organ transplant, specific cancers, severe respiratory conditions, other rare conditions, on immunosuppressants, and additional conditions [@mckeigue_relation_2021-1].  Those ineligible for shielding were classified according to the presence of conditions designated by public health agencies as "moderate risk conditions" as described previously [@mckeigue_rapid_2020].  This analysis is based on cases presenting from 1 December 2020 to 16 March 2021 (the latest linkage dataset available at the time of preparing this report).
+
+Vaccination status in cases was coded as having had at least one dose of any vaccine at least 14 days before presentation date. This assigns cases (and their matched controls) who were vaccinated less than 14 days prior to the case date to the unexposed category.  The numbers of cases and controls were too few to allow further subdivision of time since vaccination.  
+
+The effect of vaccination in each of the clinical vulnerability categories was estimated in a conditional logistic regression model (R function `survival::clogit`, package version_3.2-7, R version 3.6.3) fitted to the full dataset, specifying effects \ensuremath{\beta_{R2}, \dots, \beta_{RJ}} for the log rate ratio associated with risk categories 2 to \ensuremath{J} (\ensuremath{\beta_{R1} = 0} for the reference category \ensuremath{J=1}), and nested effects \ensuremath{\beta_{V1}, \dots, \beta_{VJ}} for the log rate ratio associated with vaccination in each of the \ensuremath{J} risk categories. With this incidence density sampling design, the conditional odds ratio is the rate ratio.  The efficacy of vaccination is 1 minus the rate ratio.  The strata in the conditional logistic regression model are matched sets: typically one case and up to 10 controls, but where two cases with the same age, sex and GP practice present on the same day the matched set comprises two cases and up to 20 controls.  When estimating the rate ratio within a risk group such as a shielding category, only cases and controls in that risk group are retained in the matched sets.   Matched sets in which all are vaccinated or none are vaccinated do not contribute to the rate ratio.   We emphasize that the unconditional odds ratios calculated from summary tables of the vaccination status of cases and controls in each risk group cannot be used to estimate rate ratios [@breslow_estimation_1978;@greenland_need_1982].   The design controls not only for the matching factors of age, sex and general practice but also for calendar time.  Because severe COVID-19 is strongly associated with care home residence and care home residents were a priority group for vaccination, the model includes care home residence as a covariate.
+
+Severe COVID-19 is strongly associated with recent hospital admission.  This might confound the association of severe COVID-19 with vaccination if hospital admission causes vaccination appointments to be missed or alternatively if hospital admission increases the probability of being vaccinated by a given date.  Therefore the analysis was repeated with adjustment for any hospital discharge from 2 to 8 weeks before presentation date, and for being an inpatient for at least 8 days before presentation date (the criterion for probable/definite hospital-acquired infection [@european_centre_for_disease_prevention_and_control_surveillance_2020]). We also reported the vaccine efficacy for severe COVID-19 separating out those with conditions designated previously by Public Health Scotland as moderate risk from the remainder not eligible for shielding.
+
+To allow inference on vaccine efficacy in smaller groups, the analysis was repeated with the case definition extended to include all cases that were hospitalized or fatal.  
+
+## Ethical considerations
+This study was performed within Public Health Scotland as part of its statutory duty to monitor and investigate public health problems.  Under the [UK Policy Framework for Health and Social Care Research](https://www.hra.nhs.uk/planning-and-improving-research/policies-standards-legislation/uk-policy-framework-health-social-care-research/) set out by the NHS Health Research Authority, this does not fall within the definition of research and ethical review is not required.  Individual consent is not required for Public Health Scotland staff to process personal data to perform specific tasks in the public interest that fall within its statutory role.  The statutory basis for this is set out in Public Health Scotland's [privacy notice](https://www.publichealthscotland.scot/our-privacy-notice/personal-data-processing/).  
+A Data Protection Impact Assessment​ (DPIA) allows Public Health Scotland staff to link existing datasets.  This study was approved under COVID-19 Rapid DPIA 20210023.  Datasets were de-identified before analysis.  
+ 
+# Results
+Over the study period there were  `r cc.vax[CASE==1, .N, by=shield.any][2, 2]` severe cases among those eligible for shielding `r cc.vax[CASE==1 & fatalcase, .N, by=shield.any][2, 2]` of which were fatal and  `r cc.vax[CASE==1, .N, by=shield.any][1, 2]`  severe cases  among those not eligible for shielding of which  `r cc.vax[CASE==1 & fatalcase, .N, by=shield.any][1, 2]` were fatal. Figure \ref{fig:plotvax} shows the time course of daily severe cases in Scotland and vaccination among those eligible for shielding.  The proportion vaccinated at least 14 days before is estimated from those sampled as controls who were eligible for shielding.  From January to February 2020 the daily number of severe cases declined rapidly and the proportion vaccinated among those eligible for shielding rose from 2% to 87%.   The association between vaccination and severe disease is thus confounded by calendar time.  This confounding is controlled by the matching of cases and controls on calendar date but we reiterate that because of this the unconditional odds ratios calculated from Tables \ref{tab:freqsshieldgroups} and \ref{tab:freqshosp} cannot be used to estimate rate ratios [@greenland_need_1982].  Information about vaccine efficacy in those eligible for shielding is contributed by matched sets of cases and controls in the narrow time window during which incidence of severe COVID-19 was high and at least some of those eligible for shielding had been vaccinated at least 14 days before.  Up to 16 March 2021 the proportion who had received a second dose at least 14 days before the date of sampling was very low: `r table.vaxshield[3, 1]` of the `r table.vaxshield[4, 1]` controls ineligible for shielding and `r table.vaxshield[3, 2]` of the `r table.vaxshield[4, 2]` controls eligible for shielding.  
+
+Table \ref{tab:freqsshieldgroups} shows  the vaccination status of severe cases and  their controls  by risk stratum.  Table \ref{tab:freqshosp} shows the same breakdown for hospitalised cases and controls.  These tables illustrate that the data are very sparse for certain shielding groups especially solid organ transplant recipients.   
+
+ The rate ratio for severe COVID-19 associated with vaccination at least 14 days before was `r format.estci(table.riskgroups2$rateratio[4])` in those eligible for shielding, compared with `r format.estci(table.riskgroups2$rateratio[3])` in those ineligible for shielding.   When inpatient stay for at least 8 days before presentation and any hospital discharge from 15 to 56 days before presentation were included as covariates, the corresponding rate ratios were  `r format.estci(table.adjhosp$rateratio[6])` in those eligible and  `r format.estci(table.adjhosp$rateratio[5])` in those ineligible for shielding. Table \ref{tab:shieldgroups} gives a breakdown of the rate ratios for severe COVID-19  associated with vaccination by shielding condition.  Point estimates for the rate ratio associated with vaccination in risk groups were similar to the estimated rate ratio in those not eligible for shielding,  with the exception of solid organ transplant recipients and others on immunosuppressants in whom the numbers of cases were small (Table \ref{tab:freqsshieldgroups}) and confidence intervals were wide. 
+
+When those ineligible for shielding were separated into those with moderate risk conditions  and those with no risk condition the rate ratios  for severe COVID-19 associated with vaccination were `r format.estci(table.riskgroups[5, 2])` and `r format.estci(table.riskgroups[4, 2])` respectively.  Among people with diabetes who were ineligible for shielding (and thus in the "moderate risk conditions" category), the rate ratios for severe COVID-19 associated with vaccination were `r format.estci(table.dmriskgroups$rateratio[2])` and `r format.estci(table.dmriskgroups$rateratio[3])` in those with Type 1 and Type 2 diabetes respectively.  
+
+For a secondary analysis with larger numbers of cases, the case definition was broadened to include all hospitalized or fatal cases.  The rate ratio for hospitalised or fatal COVID-19 was `r format.estci(table.riskgroups2.hosp$rateratio[4])` in those  eligible and  `r format.estci(table.riskgroups2.hosp$rateratio[3])` in those not eligible for shielding.   Table \ref{tab:shieldelig} shows that there was evidence for efficacy in all groups except solid organ transplant recipients in whom even with this broader case definition the numbers of cases and controls were too small for efficacy to be estimated reliably. 
+
+# Conclusions
+## Statement of principal findings
+Efficacy of a single vaccination dose in protecting against severe COVID-19 was as high or higher in those eligible for shielding as in those without risk conditions. This is reassuring in the light of reports that vaccine-induced antibody conversion is impaired in clinically vulnerable groups such as those with haematologic malignancies [@monin-aldama_interim_2021] and those on immunosuppressants for chronic inflammatory disease [@deepak_glucocorticoids_2021].  However for solid organ transplant recipients -- the group at highest risk among those eligible for shielding -- the number of cases in the Scottish population is too small for the efficacy of vaccination to be estimated.  
+
+## Strengths and limitations
+Strengths of  this analysis are the linkage to a pre-existing register of individuals designated as clinically extremely vulnerable, the ability to adjust for recent hospital exposure for which there was evidence of some confounding effect and the focus on severe COVID-19 rather than test-positive cases.  Limitations of our analysis are the small numbers with specific risk conditions, especially solid organ transplant recipients, and that the estimates of efficacy are effectively for first dose only as very few of those eligible for shielding had received a second dose of vaccine during the study period.  Although data published by Public Health Scotland show that by 29 May 2021 90% of those eligible for shielding had received two vaccine doses, there have been too few cases of severe disease after February 2020 for an updated estimate of the efficacy of two doses in those eligible for shielding to be reliable.
+
+## Comparison with other studies
+These estimates of efficacy of a first dose of vaccine over all time periods from 14 days post-vaccination were similar to those estimated at 14-20 days post-vaccination for the total population of Scotland [@vasileiou_interim_2021].  As we have previously shown that the shielding group overall have approximately six-fold higher risk of severe COVID-19 than those of the same age and sex without risk conditions [@mckeigue_relation_2021-1], efficacy of at least 82% (a rate ratio no more than 0.18) with a single dose would be required to lower risk to the level of unvaccinated persons of the same age and sex without risk conditions.  
+
+## Policy implications
+Whilst these results give reassurance that the vaccine is showing efficacy overall in people with extreme clinical vulnerability to COVID-19, such persons should also be advised that they remain at increased risk after a single dose (about twofold compared to those of the same age and sex without risk conditions, given the vaccine-associated rate ratio of about 0.3), and should remain vigilant  until they have received their second dose and background transmission rates  in their locale are low.  A study in a larger population is needed to estimate efficacy in solid organ transplant recipients. This would lay the basis for advising people in this group about their ongoing risk level, for whether to recommend a third dose of vaccine to improve immunogenicity [@kamar_three_2021], and for assessing the need for development of alternatives to vaccines such as synthetic antibodies. 
+
+# Declarations
+## Data Availability
+The component datasets used in this study are available via the [COVID-19 Research Database](https://www.isdscotland.org/Products-and-Services/eDRIS/COVID-19/index.asp) hosted by Public Health Scotland's electronic Data Research and Innovation Service (eDRIS). A [guidance document](https://www.isdscotland.org/Products-and-Services/eDRIS/COVID-19/_docs/20200703-COVID-19-Research-Database-Guide-for-Researchers-v4.pdf) for applicants is available on the eDRIS website.  There are no restrictions on eligibility to apply.  
+
+Archived analysis code as at time of publication:   
+License: OSI  
+
+## Competing interests
+HC receives research support and honoraria and is a member of advisory panels or speaker bureaus for Sanofi Aventis, Regeneron, Novartis, Novo-Nordisk and Eli Lilly. HC receives or has recently received non-binding research support, unrelated to this study, from AstraZeneca and Novo-Nordisk. SH received honoraria from Gilead.
+
+## Grant information 
+No specific funding was received for this study. Professor Colhoun is supported by an endowed chair from the AXA Research Foundation. 
+
+## Acknowledgements
+We thank all staff in critical care units who submitted data to the SICSAG database, the Scottish Morbidity Record Data Team, the staff of the National Register of Scotland, the Public Health Scotland Terminology Services, the HPS COVID-19 Laboratory & Testing cell and the NHS Scotland Diagnostic Virology Laboratories.  
+
+# References
+<div id="refs"></div>
+
+
+\newpage
+
+```{r plotvax, echo=FALSE, warning=FALSE, message=FALSE, fig.pos = "H", fig.width=5, fig.asp=1.2, fig.cap="\\label{fig:plotvax}(a) Daily severe cases by risk category; (b) Controls eligible for shielding: proportion vaccinated at least 14 days before, by 7-day window of date on which they were sampled as controls"}
+
+theme_set(theme_gray(base_size = 10))
+
+gridExtra::grid.arrange(p.byriskgroup, p.shieldvax, nrow=2, heights=3:2)
+
+```
+
+\newpage
+
+```{r freqsshieldgroups, echo=FALSE, message=FALSE}
+
+knitr::kable(freqs.shieldgroups, 
+             escape=FALSE, 
+             booktabs=TRUE,
+			 label="freqsshieldgroups",
+             row.names=TRUE,
+				 col.names=c("Unvaccinated", "Vaccinated", "Unvaccinated", "Vaccinated"),
+				 align=c("r", "r", "r", "r"),
+             caption="Numbers of controls and cases of severe COVID-19 by risk group and vaccination status") %>%
+    add_header_above(c(" "=1, "Controls"=2, "Cases"=2)) %>% 
+    add_footnote(label=c("Presentation dates from 1 December 2020 to 16 March 2021",
+                         "Vaccine status coded as 1 if at least one dose at least 14 days before, 0 otherwise"), 
+                 notation="none") %>%
+    column_spec(2, width="2cm") %>%
+    column_spec(3, width="2cm") %>%
+    column_spec(4, width="2cm") %>%
+    column_spec(5, width="2cm") %>%
+    column_spec(6, width="1cm") %>%
+    kable_styling(latex_options=c("hold_position")) 
+
+```
+
+```{r freqshosp, echo=FALSE, warning=FALSE, message=FALSE}
+
+knitr::kable(freqs.hosp, 
+             escape=FALSE, 
+             booktabs=TRUE,
+			 label="freqshosp",
+             row.names=TRUE,
+  		 col.names=c("Unvaccinated", "Vaccinated", "Unvaccinated", "Vaccinated"),
+             align=c("r", "r", "r", "r"),
+             caption="Numbers of controls and cases of hospitalized or fatal COVID-19 by risk group and vaccination status") %>%
+    add_header_above(c(" "=1, "Controls"=2, "Cases"=2)) %>% 
+    add_footnote(label=c("Presentation dates from 1 December 2020 to 16 March 2021",
+                         "Vaccine status coded as 1 if at least one dose at least 14 days before, 0 otherwise"), 
+                 notation="none")  %>%
+    column_spec(2, width="2cm") %>%
+    column_spec(3, width="2cm") %>%
+    column_spec(4, width="2cm") %>%
+    column_spec(5, width="2cm") %>%
+    column_spec(6, width="1cm") %>%
+    kable_styling(latex_options=c("hold_position")) 
+
+```
+\newpage
+
+```{r shieldgroups, echo=FALSE, warning=FALSE, message=FALSE}
+
+knitr::kable(table.shieldgroups[8:14, ], 
+             escape=FALSE, 
+             booktabs=TRUE,
+			 label="shieldgroups",
+             row.names=FALSE,
+             align=c("l", "r", "l"),
+             caption="Rate ratios for severe COVID-19 associated with vaccination, within each risk group",
+             col.names=c("Effect", 
+                         "Rate ratio (95\\% CI)", "\\ensuremath{p}-value")) %>%
+    add_footnote(label=c("Conditional logistic regression model matched on age, sex, general practice and presentation date",
+                         "Vaccine effects nested within each level of risk group",
+                         "Care home residence included as covariate", 
+                         "Presentation dates from 1 December 2020 to 16 March 2021",
+                         "Vaccine status coded as 1 if at least one dose at least 14 days before, 0 otherwise"), 
+                 notation="none") %>%
+    column_spec(column=1, width="6cm") %>%
+    kable_styling(latex_options=c("hold_position")) 
+
+```
+
+```{r hosp, echo=FALSE, warning=FALSE, message=FALSE}
+
+knitr::kable(table.hosp[8:14, ], 
+             escape=FALSE, 
+             booktabs=TRUE,
+			 label="shieldelig",
+             row.names=FALSE,
+             align=c("l", "r", "l"),
+             caption="Rate ratios for hospitalized or fatal COVID-19 associated with vaccination within each risk group",
+             col.names=c("Effect", "Rate ratio (95\\% CI)", 
+                         "\\ensuremath{p}-value")) %>%
+    add_footnote(label=c("Conditional logistic regression model matched on age, sex, general practice and presentation date",
+                         "Care home residence included as covariate", 
+                         "Presentation dates from 1 December 2020 to 16 March 2021",
+                         "Vaccine status coded as 1 if at least one dose at least 14 days before, 0 otherwise"), 
+                 notation="none")  %>%
+    kable_styling(latex_options=c("hold_position")) 
+
+```
